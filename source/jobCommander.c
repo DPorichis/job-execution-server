@@ -22,16 +22,6 @@
 
 int main(int argc, char* argv[])
 {
-
-    // Pending connection to server
-    // DO IT
-
-    int port, sock, i;
-    char bud[256];
-
-    struct sockaddr_in server;
-    struct sockaddr *serverptr = (struct sockaddr*)&server;
-    struct hostent *rem;
     
     if(argc < 4)
     {
@@ -94,6 +84,13 @@ int main(int argc, char* argv[])
     }
 
     // Connect to server
+
+    int port, sock, i;
+    char bud[256];
+
+    struct sockaddr_in server;
+    struct sockaddr *serverptr = (struct sockaddr*)&server;
+    struct hostent *rem;
 
     if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -193,6 +190,33 @@ int main(int argc, char* argv[])
         printf("%s", response);
         free(response);
     }    
+
+    if(cmd == ISSUE_JOB)
+    {
+        // Read the result of the command aswell
+        // Wait for server's response
+        response_size = 0;
+        if(read(sock, &response_size, sizeof(int)) < 0)
+        {
+            perror("problem in reading");
+            exit(5);
+        }
+        
+        // If server has a message to deliver
+        if(response_size!=0)
+        {
+            // Read it and print it out
+            char* response = malloc(sizeof(char)*response_size);
+            if(read(sock, response, response_size) < 0)
+            {
+                perror("problem in reading");
+                exit(5);
+            }
+            printf("%s", response);
+            free(response);
+        }
+    
+    }
 
     // The communication is officially over
     // Clean and exit
