@@ -68,9 +68,9 @@ int main(int argc, char* argv[])
         }
         cmd = POLL;
     }
-    else if(strcmp(argv[1], "exit")== 0)
+    else if(strcmp(argv[3], "exit")== 0)
     {
-        if(argc != 2)
+        if(argc != 4)
         {
             printf("Wrong number of arguments for stop\n");
             return -2;
@@ -105,8 +105,12 @@ int main(int argc, char* argv[])
 
     port = my_atoi(argv[2]);
     server.sin_family = AF_INET;
-    memcpy(&server.sin_addr, rem->h_addr_list, rem->h_length);
+    memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
     server.sin_port = htons(port);
+
+    printf("Connecting to %s port %d\n", argv[1], port);
+    fflush(stdout);
+
 
     if(connect(sock, serverptr, sizeof(server)) < 0)
     {
@@ -114,7 +118,7 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
     printf("Connecting to %s port %d\n", argv[1], port);
-
+    fflush(stdout);
 
     // Constructing our initial request
     int request[3];
