@@ -32,36 +32,36 @@ int main(int argc, char* argv[])
     // Reject basic mistakes in syntax
     // And assign the corresponding code of the command
     enum command cmd;
-    if(strcmp(argv[1], "issueJob") == 0)
+    if(strcmp(argv[3], "issueJob") == 0)
     {
-        if(argc == 2)
+        if(argc == 4)
         {
             printf("Missing command after issueJob\n");
             return -2;
         }
         cmd = ISSUE_JOB;
     }
-    else if(strcmp(argv[1], "setConcurrency") == 0)
+    else if(strcmp(argv[3], "setConcurrency") == 0)
     {
-        if(argc != 3)
+        if(argc != 5)
         {
             printf("Wrong number of arguments for setConcurrency\n");
             return -2;
         }
         cmd = SET_CONCURRENCY;  
     }
-    else if(strcmp(argv[1], "stop") == 0) 
+    else if(strcmp(argv[3], "stop") == 0) 
     {
-        if(argc != 3)
+        if(argc != 5)
         {
             printf("Wrong number of arguments for stop\n");
             return -2;
         }
         cmd = STOP;
     }
-    else if(strcmp(argv[1], "poll")== 0)
+    else if(strcmp(argv[3], "poll")== 0)
     {
-        if(argc != 2)
+        if(argc != 4)
         {
             printf("Wrong number of arguments for poll\n");
             return -2;
