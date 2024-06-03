@@ -1,1 +1,15 @@
-/lectures-syspro
+# This is just a gitignore file #
+# Nothing intresting for a grader to see #
+
+# Ignore all files, exept from directories (kinda sad) #
+*
+!*/
+
+# Exept for the ones I care about >:) #
+!*.c
+!*.h
+!Makefile
+!.gitignore
+!*.txt
+!.vscode/*.json
+!*.sh
