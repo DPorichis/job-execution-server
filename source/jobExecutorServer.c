@@ -10,6 +10,9 @@
 #include <signal.h>
 
 #include "helpfunc.h"
+#include "utils.h"
+
+Server serv = NULL;
 
 int main(int argc, char* argv[])
 {

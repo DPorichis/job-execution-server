@@ -12,6 +12,6 @@
 #include "utils.h"
 
 
-int controller(int sock);
+int controller(Server server, int sock);
 
 void* wrapper_controller(void * arg);

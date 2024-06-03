@@ -1,3 +1,5 @@
+#pragma once
+
 // Basic enumeration used to pass the command type in request
 enum command{
     ISSUE_JOB,
@@ -26,3 +28,28 @@ struct job_instance
 };
 
 typedef struct job_instance* JobInstance;
+
+
+// A total representation of server
+struct server
+{
+    JobInstance* job_queue;
+    int concurrency;
+    int running_now;
+    int front;
+    int size;
+    int queued;
+    int total_jobs;
+};
+
+typedef struct server* Server;
+
+Server server_create(int bufsize, int concurrency);
+
+char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket);
+
+char* server_setConcurrency(Server server, int new_conc);
+
+char* server_stop(Server server, char* id);
+
+char* server_poll(Server server, char* id);
