@@ -1,4 +1,6 @@
 #pragma once
+#include <pthread.h>
+
 
 // Basic enumeration used to pass the command type in request
 enum command{
@@ -40,6 +42,13 @@ struct server
     int size;
     int queued;
     int total_jobs;
+    int exiting;
+
+    pthread_mutex_t mtx;
+
+    pthread_cond_t alert_worker;
+    pthread_cond_t alert_controller;
+    
 };
 
 typedef struct server* Server;
@@ -52,4 +61,4 @@ char* server_setConcurrency(Server server, int new_conc);
 
 char* server_stop(Server server, char* id);
 
-char* server_poll(Server server, char* id);
+char* server_poll(Server server);

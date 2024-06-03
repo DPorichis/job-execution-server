@@ -10,8 +10,18 @@
 #include <signal.h>
 
 #include "utils.h"
+#include "helpfunc.h"
+
+struct controller_args 
+{
+    Server server;
+    int sock;
+};
+
+typedef struct controller_args* ControllerArgs;
 
 
 int controller(Server server, int sock);
 
 void* wrapper_controller(void * arg);
+

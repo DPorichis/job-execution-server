@@ -18,7 +18,7 @@ $(BUILD)/%.o: $(SOURCE)/%.c
 
 
 jobExecutorServer: $(SEROBJ)
-	gcc $(SEROBJ) -o $(BIN)/jobExecutorServer
+	gcc $(SEROBJ) -o $(BIN)/jobExecutorServer -lpthread
 
 jobCommander: $(COMOBJ)
 	gcc $(COMOBJ) -o $(BIN)/jobCommander

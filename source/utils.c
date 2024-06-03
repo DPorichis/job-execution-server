@@ -14,11 +14,17 @@ Server server_create(int bufsize, int concurrency)
     serv->total_jobs = 1;
     serv->size = bufsize;
     serv->concurrency = concurrency;
+    serv->exiting = 0;
 
     serv->job_queue = malloc(sizeof(JobInstance)*bufsize);
     for(int i = 0; i < bufsize; i++)
         serv->job_queue[i] = NULL;
     
+    pthread_cond_init(&serv->alert_worker, NULL);
+    pthread_cond_init(&serv->alert_controller, NULL);
+
+    pthread_mutex_init(&serv->mtx, NULL);
+
     return serv;
 }
 
@@ -92,7 +98,7 @@ char* server_stop(Server server, char* id)
     // Unlock
 }
 
-char* server_poll(Server server, char* id)
+char* server_poll(Server server)
 {
     // Lock the mutex
     
@@ -107,6 +113,12 @@ char* server_poll(Server server, char* id)
 }
 
 int server_exit()
+{
+
+}
+
+
+void server_destroy(Server server)
 {
 
 }
