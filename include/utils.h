@@ -53,7 +53,7 @@ struct server
 
 typedef struct server* Server;
 
-Server server_create(int bufsize, int concurrency);
+Server server_create(int bufsize, int concurrency, int worker_num);
 
 char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket);
 
@@ -62,3 +62,5 @@ char* server_setConcurrency(Server server, int new_conc);
 char* server_stop(Server server, char* id);
 
 char* server_poll(Server server);
+
+JobInstance server_getJob(Server server);

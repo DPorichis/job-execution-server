@@ -46,18 +46,27 @@ int main(int argc, char* argv[])
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(port);
 
-    serv = server_create(my_atoi(argv[2]), 1);
-
     int threadpoolsize = my_atoi(argv[3]);
+
+    printf("check\n");
+    fflush(stdout);
+
+    serv = server_create(my_atoi(argv[2]), 1, threadpoolsize);
+
+    printf("check\n");
+    fflush(stdout);
+
     for(int i = 0; i < threadpoolsize; i++)
     {
         pthread_t thr;
         int err;
-        if(err = pthread_create(&thr, NULL, wrapper_worker, NULL))
+        if(err = pthread_create(&thr, NULL, wrapper_worker, serv))
         {
             fprintf(stderr, "pthread create");
             exit(1);
         }
+        printf("check\n");
+        fflush(stdout);
     }
 
 

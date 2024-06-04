@@ -143,10 +143,11 @@ int main(int argc, char* argv[])
         for(int a = 4; a < argc; a++) // This may be unecessary
         {
             strcpy(copying_string, argv[a]);
+            printf("%s\n", copying_string);
             copying_string += strlen(argv[a])+1;
         }
 
-        //Number of sent arguments excluding ./jobCommander <Command>
+        //Number of sent arguments excluding ./jobCommander [server Name] [portNum] <Command>
         command_argc = argc - 4;
 
     }
@@ -165,7 +166,7 @@ int main(int argc, char* argv[])
     if(number_of_characters !=0)
     {
         // Send them using our private communication
-        if(write(sock, request, sizeof(transmit)) < 0)
+        if(write(sock, transmit, number_of_characters*sizeof(char)) < 0)
         {
             perror("write");
             exit(EXIT_FAILURE);

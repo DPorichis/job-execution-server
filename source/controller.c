@@ -22,12 +22,15 @@ int controller(Server server, int sock)
     char * command_string = NULL;
 
     char** request_argv = NULL;
+
+    printf("Request recieved\n");
     
     // If we have arguments to read aswell
     if(request_char_num !=0)
     {
         command_string = malloc(request_char_num);
-        if(read(sock, request, sizeof(request_char_num)) < 0)
+        printf("%d\n", request_char_num);
+        if(read(sock, command_string, request_char_num * sizeof(char)) < 0)
         {
             perror("read");
             exit(EXIT_FAILURE);
@@ -40,9 +43,14 @@ int controller(Server server, int sock)
             int len_of_arg = (strlen(command_string+offset)+1);
             request_argv[i] = malloc(len_of_arg*sizeof(char));
             strcpy(request_argv[i], command_string+offset);
-            offset += len_of_arg;    
+            offset += len_of_arg;
+            printf("%s ", request_argv[i]);
         }
-        request_argv[request_argc] = NULL;    
+        request_argv[request_argc] = NULL;
+        
+        // for(int i = 0; i < request_argc; i++)
+        //     printf("%s ", request_argv[i]);
+        // printf("\n");  
 
     }
     char* response_message = NULL;

@@ -3,7 +3,15 @@
 
 int worker(Server server)
 {
-
+    while(1)
+    {
+        JobInstance to_execute = server_getJob(server);
+        //Do the funny with the execution
+    
+    
+    
+    
+    }
 }
 
 

@@ -5,12 +5,12 @@
 #include <string.h>
 
 
-Server server_create(int bufsize, int concurrency)
+Server server_create(int bufsize, int concurrency, int worker_num)
 {
     Server serv = malloc(sizeof(*serv));
     serv->front = 0;
     serv->queued = 0;
-    serv->running_now = 0;
+    serv->running_now = worker_num;
     serv->total_jobs = 1;
     serv->size = bufsize;
     serv->concurrency = concurrency;
@@ -31,13 +31,11 @@ Server server_create(int bufsize, int concurrency)
 char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket)
 {
     // Lock the mutex
-    
-    while(server->queued == server->size)
-    {
-        // Sleep again
-    }
-    
+    pthread_mutex_lock(&server->mtx);
 
+    while(server->queued >= server->size)
+        pthread_cond_wait(&server->alert_controller, &server->mtx);
+    
     // Space available, insert it at the end of the cycle
     
     // Create a new JobInstance
@@ -65,22 +63,29 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
     server->queued++;
     server->total_jobs++;
 
-    // Unlock
+    if(server->running_now < server->concurrency)
+        pthread_cond_signal(&server->alert_worker);
+    pthread_mutex_unlock(&server->mtx);
 
 }
 
 char* server_setConcurrency(Server server, int new_conc)
 {
-    // Lock the mutex
+    pthread_mutex_lock(&server->mtx);
+
     server->concurrency = new_conc;
-    // Unlock
+
+    if(server->running_now < server->concurrency && server->queued != 0)
+        pthread_cond_signal(&server->alert_worker);
+    pthread_mutex_unlock(&server->mtx);
 
 }
 
 
 char* server_stop(Server server, char* id)
 {
-    // Lock the mutex
+    pthread_mutex_lock(&server->mtx);
+    
     for(int i = 0; i < server->size; i++)
     {
         if (server->job_queue[i] != NULL)
@@ -95,12 +100,18 @@ char* server_stop(Server server, char* id)
         }
     }    
     
-    // Unlock
+    server->queued--;
+
+    if(server->size - 1 != server->queued)
+        pthread_cond_signal(&server->alert_controller);
+    
+    pthread_mutex_unlock(&server->mtx);
+    
 }
 
 char* server_poll(Server server)
 {
-    // Lock the mutex
+    pthread_mutex_lock(&server->mtx);
     
     for(int i = 0; server->queued > i; i++)
     {
@@ -108,7 +119,7 @@ char* server_poll(Server server)
         // Constract string
     }
 
-    // Unlock the mutex
+    pthread_mutex_unlock(&server->mtx);
 
 }
 
@@ -121,4 +132,24 @@ int server_exit()
 void server_destroy(Server server)
 {
 
+}
+
+JobInstance server_getJob(Server server)
+{
+    pthread_mutex_lock(&server->mtx);
+
+    server->running_now--;
+
+    while(server->queued == 0 || server->concurrency >= server->running_now)
+        pthread_cond_wait(&server->alert_worker, &server->mtx);
+        
+    // Get your job
+
+    server->queued--;
+    server->running_now++;
+
+
+    if(server->size - 1 == server->queued)
+        pthread_cond_signal(&server->alert_controller); 
+    pthread_mutex_unlock(&server->mtx);
 }
