@@ -58,30 +58,44 @@ int controller(Server server, int sock)
     switch (cmd) 
     {
         case ISSUE_JOB: ;
-            server_issueJob(server, request_argv ,request_argc, sock);
+            response_message = server_issueJob(server, request_argv ,request_argc, sock);
             break;
         case SET_CONCURRENCY:
-            server_setConcurrency(server, my_atoi(request_argv[0]));
+            response_message = server_setConcurrency(server, my_atoi(request_argv[0]));
             break;
         case STOP:
-            server_stop(server, request_argv[0]);
+            response_message = server_stop(server, request_argv[0]);
             break;
         case POLL:;
             server_poll(server);
             break;
         case EXIT:
             response_message = "jobExecutorServer terminated\n";
-            number_of_char_response = strlen(response_message) + 1;
             break;
         default:
             // That doesn't seem right
-            response_message = "Unexpected Error\n";
-            number_of_char_response = strlen(response_message) + 1;            
+            response_message = "Unexpected Error\n";           
     }
 
+    number_of_char_response = strlen(response_message) + 1;
 
+    if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+    {
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
 
-
+    // If we have arguments to send aswell
+    if(number_of_char_response !=0)
+    {
+        // Send them using our private communication
+        if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
+        {
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
+        free(response_message);
+    }
 
 }
 

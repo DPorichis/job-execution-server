@@ -206,6 +206,8 @@ int main(int argc, char* argv[])
             perror("problem in reading");
             exit(5);
         }
+
+        printf("%d\n", response_size);
         
         // If server has a message to deliver
         if(response_size!=0)
