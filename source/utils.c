@@ -4,6 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <signal.h>
 
 Server server_create(int bufsize, int concurrency, int worker_num)
 {
@@ -82,6 +90,26 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
 
     printf("%d / %d", server->running_now, server->concurrency);
     fflush(stdout);
+
+    int number_of_char_response = strlen(response_message) + 1;
+
+    if(write(job_socket, &number_of_char_response, sizeof(int)) < 0)
+    {
+        perror("write");
+        exit(EXIT_FAILURE);
+    }
+
+    // If we have arguments to send aswell
+    if(number_of_char_response !=0)
+    {
+        // Send them using our private communication
+        if(write(job_socket, response_message, number_of_char_response*sizeof(char)) < 0)
+        {
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     if(server->running_now < server->concurrency)
         pthread_cond_signal(&server->alert_worker);
 

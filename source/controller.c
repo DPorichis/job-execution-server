@@ -77,24 +77,28 @@ int controller(Server server, int sock)
             response_message = "Unexpected Error\n";           
     }
 
-    number_of_char_response = strlen(response_message) + 1;
-
-    if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+    if(cmd != ISSUE_JOB)
     {
-        perror("write");
-        exit(EXIT_FAILURE);
-    }
 
-    // If we have arguments to send aswell
-    if(number_of_char_response !=0)
-    {
-        // Send them using our private communication
-        if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
+        number_of_char_response = strlen(response_message) + 1;
+
+        if(write(sock, &number_of_char_response, sizeof(int)) < 0)
         {
             perror("write");
             exit(EXIT_FAILURE);
         }
-        free(response_message);
+
+        // If we have arguments to send aswell
+        if(number_of_char_response !=0)
+        {
+            // Send them using our private communication
+            if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+            free(response_message);
+        }
     }
 
 }
