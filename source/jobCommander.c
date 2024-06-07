@@ -200,29 +200,35 @@ int main(int argc, char* argv[])
     {
         // Read the result of the command aswell
         // Wait for server's response
-        response_size = 0;
-        if(read(sock, &response_size, sizeof(int)) < 0)
+        do
         {
-            perror("problem in reading");
-            exit(5);
-        }
+            char buffer[257];
+            buffer[256] = '\0';
 
-        printf("%d\n", response_size);
-        
-        // If server has a message to deliver
-        if(response_size!=0)
-        {
-            // Read it and print it out
-            char* response = malloc(sizeof(char)*response_size);
-            if(read(sock, response, response_size) < 0)
+            response_size = 0;
+            if(read(sock, &response_size, sizeof(int)) < 0)
             {
                 perror("problem in reading");
                 exit(5);
             }
-            printf("%s", response);
-            free(response);
-        }
-    
+
+            printf("%d\n", response_size);
+            
+            // If server has a message to deliver
+            if(response_size!=0)
+            {
+                // Read it and print it out
+                char* response = malloc(sizeof(char)*response_size);
+                if(read(sock, buffer, response_size) < 0)
+                {
+                    perror("problem in reading");
+                    exit(5);
+                }
+                printf("%s", response);
+                free(response);
+            }
+        }while (response_size != 0);
+        
     }
 
     // The communication is officially over

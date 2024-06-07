@@ -60,24 +60,75 @@ int worker(Server server)
         if ((childpid = waitpid(childpid, NULL, 0)) == -1 ) {
             perror ("wait failed"); exit(2);
         }
+
+        // Reading the output file
+        int output_file;
+        char name[100];
+        sprintf(name, "%d.output", getpid());
         
-        char* transmit = "To etrexa jerw egw\n";
-        int transmit_size = strlen(transmit) + 1;
+        if((output_file = open(name, O_RDWR, 0644)) == -1)
+        {
+            perror("Problem in reading the outputfile");
+            exit(1);
+        }
 
-        printf("message size: %d \n", transmit_size);
-        fflush(stdout);
+        char buffer[256];
+        int used = sprintf(buffer, "-----%s output start-----\n", to_execute->jobID);
+        if (write(output_file, buffer, used) < 0)
+        {
+            perror("output manipulation error");
+            exit(EXIT_FAILURE);
+        }
+        lseek(output_file, 0, SEEK_END);
 
+        used = sprintf(buffer, "-----%s output end-----\n", to_execute->jobID);
+        if (write(output_file, buffer, used) < 0)
+        {
+            perror("output manipulation error");
+            exit(EXIT_FAILURE);
+        }
+
+        lseek(output_file, 0, SEEK_SET);
+        int transmit_size;
+        while((transmit_size = read(output_file, buffer, 256)) > 0)
+        {
+            if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+
+            if(write(to_execute->socket, buffer, transmit_size*sizeof(char)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+        }
+        transmit_size = 0;
         if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
         {
             perror("write");
             exit(EXIT_FAILURE);
         }
 
-        if(write(to_execute->socket, transmit, transmit_size*sizeof(char)) < 0)
-        {
-            perror("write");
-            exit(EXIT_FAILURE);
-        }
+
+        // char* transmit = "To etrexa jerw egw\n";
+        // transmit_size = strlen(transmit) + 1;
+
+        // printf("message size: %d \n", transmit_size);
+        // fflush(stdout);
+
+        // if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
+        // {
+        //     perror("write");
+        //     exit(EXIT_FAILURE);
+        // }
+
+        // if(write(to_execute->socket, transmit, transmit_size*sizeof(char)) < 0)
+        // {
+        //     perror("write");
+        //     exit(EXIT_FAILURE);
+        // }
     
     
     }
