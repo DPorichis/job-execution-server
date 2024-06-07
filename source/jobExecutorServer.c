@@ -48,13 +48,7 @@ int main(int argc, char* argv[])
 
     int threadpoolsize = my_atoi(argv[3]);
 
-    printf("check\n");
-    fflush(stdout);
-
     serv = server_create(my_atoi(argv[2]), 1, threadpoolsize);
-
-    printf("check\n");
-    fflush(stdout);
 
     for(int i = 0; i < threadpoolsize; i++)
     {
@@ -65,8 +59,6 @@ int main(int argc, char* argv[])
             fprintf(stderr, "pthread create");
             exit(1);
         }
-        printf("check\n");
-        fflush(stdout);
     }
 
 
@@ -76,7 +68,7 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    if(listen(sock, 5) < 0)
+    if(listen(sock, 10) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);

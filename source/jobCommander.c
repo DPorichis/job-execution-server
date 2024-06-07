@@ -108,8 +108,8 @@ int main(int argc, char* argv[])
     memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
     server.sin_port = htons(port);
 
-    printf("Connecting to %s port %d\n", argv[1], port);
-    fflush(stdout);
+    // printf("Connecting to %s port %d\n", argv[1], port);
+    // fflush(stdout);
 
 
     if(connect(sock, serverptr, sizeof(server)) < 0)
@@ -117,8 +117,6 @@ int main(int argc, char* argv[])
         perror("connect");
         exit(EXIT_FAILURE);
     }
-    printf("Connecting to %s port %d\n", argv[1], port);
-    fflush(stdout);
 
     // Constructing our initial request
     int request[3];
@@ -143,7 +141,6 @@ int main(int argc, char* argv[])
         for(int a = 4; a < argc; a++) // This may be unecessary
         {
             strcpy(copying_string, argv[a]);
-            printf("%s\n", copying_string);
             copying_string += strlen(argv[a])+1;
         }
 
@@ -203,29 +200,23 @@ int main(int argc, char* argv[])
         do
         {
             char buffer[257];
-            buffer[256] = '\0';
-
             response_size = 0;
             if(read(sock, &response_size, sizeof(int)) < 0)
             {
                 perror("problem in reading");
                 exit(5);
             }
-
-            printf("%d\n", response_size);
-            
+            buffer[response_size] = '\0';
             // If server has a message to deliver
             if(response_size!=0)
             {
                 // Read it and print it out
-                char* response = malloc(sizeof(char)*response_size);
                 if(read(sock, buffer, response_size) < 0)
                 {
                     perror("problem in reading");
                     exit(5);
                 }
-                printf("%s", response);
-                free(response);
+                printf("%s", buffer);
             }
         }while (response_size != 0);
         

@@ -64,7 +64,7 @@ int worker(Server server)
         // Reading the output file
         int output_file;
         char name[100];
-        sprintf(name, "%d.output", getpid());
+        sprintf(name, "%d.output", childpid);
         
         if((output_file = open(name, O_RDWR, 0644)) == -1)
         {
@@ -92,6 +92,7 @@ int worker(Server server)
         int transmit_size;
         while((transmit_size = read(output_file, buffer, 256)) > 0)
         {
+            printf("Transmiting %d characters\n", transmit_size);
             if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
             {
                 perror("write");
