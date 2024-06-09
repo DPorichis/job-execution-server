@@ -45,6 +45,14 @@ int worker(Server server)
                 perror("creating");
                 exit(1);
             }
+            char buffer[256];
+            int used = sprintf(buffer, "-----%s output start-----\n", to_execute->jobID);
+            if (write(output_file, buffer, used) < 0)
+            {
+                perror("output manipulation error");
+                exit(EXIT_FAILURE);
+            }
+
             dup2(output_file, 1);
             
             // Execute the command girl
@@ -71,17 +79,11 @@ int worker(Server server)
             perror("Problem in reading the outputfile");
             exit(1);
         }
-
-        char buffer[256];
-        int used = sprintf(buffer, "-----%s output start-----\n", to_execute->jobID);
-        if (write(output_file, buffer, used) < 0)
-        {
-            perror("output manipulation error");
-            exit(EXIT_FAILURE);
-        }
+        
         lseek(output_file, 0, SEEK_END);
 
-        used = sprintf(buffer, "-----%s output end-----\n", to_execute->jobID);
+        char buffer[256];
+        int used = sprintf(buffer, "-----%s output end-----\n", to_execute->jobID);
         if (write(output_file, buffer, used) < 0)
         {
             perror("output manipulation error");

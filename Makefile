@@ -23,4 +23,7 @@ jobExecutorServer: $(SEROBJ)
 jobCommander: $(COMOBJ)
 	gcc $(COMOBJ) -o $(BIN)/jobCommander
 
-all: jobExecutorServer jobCommander
+progDelay: $(TESOBJ)
+	gcc $(TESOBJ) -o $(BIN)/progDelay
+
+all: jobExecutorServer jobCommander progDelay
