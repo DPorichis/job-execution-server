@@ -99,6 +99,7 @@ int controller(Server server, int sock)
             }
             free(response_message);
         }
+        close(sock);
     }
 
 }

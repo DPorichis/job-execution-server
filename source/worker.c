@@ -119,27 +119,10 @@ int worker(Server server)
             perror("write");
             exit(EXIT_FAILURE);
         }
-
-
-        // char* transmit = "To etrexa jerw egw\n";
-        // transmit_size = strlen(transmit) + 1;
-
-        // printf("message size: %d \n", transmit_size);
-        // fflush(stdout);
-
-        // if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
-        // {
-        //     perror("write");
-        //     exit(EXIT_FAILURE);
-        // }
-
-        // if(write(to_execute->socket, transmit, transmit_size*sizeof(char)) < 0)
-        // {
-        //     perror("write");
-        //     exit(EXIT_FAILURE);
-        // }
-    
-    
+        
+        close(to_execute->socket);
+        close(output_file);
+        unlink(name);    
     }
 }
 

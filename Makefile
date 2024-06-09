@@ -21,7 +21,7 @@ jobExecutorServer: $(SEROBJ)
 	gcc $(SEROBJ) -o $(BIN)/jobExecutorServer -lpthread
 
 jobCommander: $(COMOBJ)
-	gcc $(COMOBJ) -o $(BIN)/jobCommander
+	gcc $(COMOBJ) -o $(BIN)/jobCommander -lpthread
 
 progDelay: $(TESOBJ)
 	gcc $(TESOBJ) -o $(BIN)/progDelay

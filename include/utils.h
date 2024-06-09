@@ -44,11 +44,14 @@ struct server
     int queued;
     int total_jobs;
     int exiting;
+    int alive_threads;
+
 
     // Sync Control
     pthread_mutex_t mtx;
     pthread_cond_t alert_worker;
     pthread_cond_t alert_controller;
+    pthread_cond_t alert_exiting;
 
     // Connection Info (LOCK IS NOT REQUIRED)
     pthread_t main_thread;
@@ -71,5 +74,7 @@ char* server_stop(Server server, char* id);
 char* server_poll(Server server);
 
 char* server_exit(Server server);
+
+void server_destroy(Server server);
 
 JobInstance server_getJob(Server server);

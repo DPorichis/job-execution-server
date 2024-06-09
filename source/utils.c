@@ -24,6 +24,7 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
     serv->concurrency = concurrency;
     serv->exiting = 0;
     serv->main_thread = 0;
+    serv->alive_threads = worker_num;
 
     serv->job_queue = malloc(sizeof(JobInstance)*bufsize);
     for(int i = 0; i < bufsize; i++)
@@ -31,6 +32,7 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
     
     pthread_cond_init(&serv->alert_worker, NULL);
     pthread_cond_init(&serv->alert_controller, NULL);
+    pthread_cond_init(&serv->alert_exiting, NULL);
     pthread_mutex_init(&serv->mtx, NULL);
 
     serv->main_thread = main;
@@ -46,7 +48,6 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
     while(server->queued >= server->size && server->exiting == 0)
         pthread_cond_wait(&server->alert_controller, &server->mtx);
     
-
     char* response_message = NULL; 
     if(server->exiting == 1)
     {
@@ -129,6 +130,10 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
     if(server->running_now < server->concurrency)
         pthread_cond_signal(&server->alert_worker);
 
+    server->alive_threads--;
+    if(server->alive_threads == 0 && server->exiting == 1)
+        pthread_cond_signal(&server->alert_exiting);
+
     pthread_mutex_unlock(&server->mtx);
 
     return response_message;
@@ -150,6 +155,10 @@ char* server_setConcurrency(Server server, int new_conc)
 
     sprintf(response_message, "CONCURRENCY SET AT %s\n", conc_string);
 
+    server->alive_threads--;
+    if(server->alive_threads == 0 && server->exiting == 1)
+        pthread_cond_signal(&server->alert_exiting);
+
     return response_message;
 }
 
@@ -157,8 +166,7 @@ char* server_setConcurrency(Server server, int new_conc)
 char* server_stop(Server server, char* id)
 {
     pthread_mutex_lock(&server->mtx);
-    
-    
+
     char* response_message = NULL;
     
     for(int i = 0; i < server->queued; i++)
@@ -196,6 +204,10 @@ char* server_stop(Server server, char* id)
 
     if(server->size - 1 != server->queued)
         pthread_cond_signal(&server->alert_controller);
+
+    server->alive_threads--;
+    if(server->alive_threads == 0 && server->exiting == 1)
+        pthread_cond_signal(&server->alert_exiting);
     
     pthread_mutex_unlock(&server->mtx);
     
@@ -261,6 +273,9 @@ char* server_poll(Server server)
     printf("check\n");
     fflush(stdout);
 
+    server->alive_threads--;
+    if(server->alive_threads == 0 && server->exiting == 1)
+        pthread_cond_signal(&server->alert_exiting);
 
     pthread_mutex_unlock(&server->mtx);
 
@@ -273,56 +288,12 @@ char* server_exit(Server server)
 {
     pthread_mutex_lock(&server->mtx);
 
-    pthread_cancel(&server->main_thread);
+    pthread_kill(server->main_thread, SIGUSR1);
     // Indicate Exiting status
     server->exiting = 1;
 
-    // Stop all queued jobs
-    for(int i = 0; i < server->size; i++)
-    {
-        char* response_message = "SERVER TERMINATED BEFORE EXECUTION\n";
-        int number_of_char_response = strlen(response_message) + 1;
-
-        if(server->job_queue[i] != NULL)
-        {
-            int sock = server->job_queue[i]->socket;
-            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
-            {
-                perror("write");
-                exit(EXIT_FAILURE);
-            }
-
-            // If we have arguments to send aswell
-            if(number_of_char_response !=0)
-            {
-                // Send them using our private communication
-                if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
-                {
-                    perror("write");
-                    exit(EXIT_FAILURE);
-                }
-            }
-
-            number_of_char_response = 0;
-
-            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
-            {
-                perror("write");
-                exit(EXIT_FAILURE);
-            }
-        
-            // Destroy the job
-            
-            server->job_queue[i] = NULL;
-        }
-    }
-    server->front = 0;
-    server->queued = 0;
-    
-
-    // Wake-up everyone to let thme know we are exiting
-    pthread_cond_broadcast(&server->alert_controller);
-    pthread_cond_broadcast(&server->alert_worker);
+    server->alive_threads--;
+    pthread_mutex_unlock(&server->mtx);
 
     char* response = malloc(sizeof(char) * (strlen("SERVER TERMINATED\n") + 1));
     sprintf(response, "SERVER TERMINATED\n");
@@ -332,20 +303,40 @@ char* server_exit(Server server)
 
 void server_destroy(Server server)
 {
+    free(server->job_queue);
+
+    pthread_cond_destroy(&server->alert_worker);
+    pthread_cond_destroy(&server->alert_controller);
+    pthread_cond_destroy(&server->alert_exiting);
+    pthread_mutex_destroy(&server->mtx);
+
+    free(server);
 
 }
 
 JobInstance server_getJob(Server server)
 {
+    printf("Checking for a job...\n");
+    fflush(stdout);
+
     pthread_mutex_lock(&server->mtx);
 
     server->running_now--;
+
+    printf("locked the mutex with running threads %d...\n", server->alive_threads);
+    fflush(stdout);
 
     while((server->queued == 0 || server->concurrency <= server->running_now) && server->exiting == 0)
         pthread_cond_wait(&server->alert_worker, &server->mtx);
     
     if(server->exiting == 1)
     {
+        server->alive_threads--;
+        printf("Alive threads: %d\n", server->alive_threads);
+        fflush(stdout);
+        if(server->alive_threads == 0)
+            pthread_cond_signal(&server->alert_exiting);
+        pthread_mutex_unlock(&server->mtx);
         return NULL;
     }
 
