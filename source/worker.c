@@ -24,6 +24,12 @@ int worker(Server server)
         // THIS IS NOT BUSY WAITING
         JobInstance to_execute = server_getJob(server);
         
+        if(to_execute == NULL)
+        {
+            pthread_cond_broadcast(&server->alert_controller);
+            pthread_exit(0);
+        }
+
         //Do the funny with the execution
         
         pid_t childpid = fork();

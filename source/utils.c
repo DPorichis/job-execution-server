@@ -13,7 +13,7 @@
 #include <ctype.h>
 #include <signal.h>
 
-Server server_create(int bufsize, int concurrency, int worker_num)
+Server server_create(int bufsize, int concurrency, int worker_num, pthread_t main)
 {
     Server serv = malloc(sizeof(*serv));
     serv->front = 0;
@@ -23,6 +23,7 @@ Server server_create(int bufsize, int concurrency, int worker_num)
     serv->size = bufsize;
     serv->concurrency = concurrency;
     serv->exiting = 0;
+    serv->main_thread = 0;
 
     serv->job_queue = malloc(sizeof(JobInstance)*bufsize);
     for(int i = 0; i < bufsize; i++)
@@ -30,8 +31,9 @@ Server server_create(int bufsize, int concurrency, int worker_num)
     
     pthread_cond_init(&serv->alert_worker, NULL);
     pthread_cond_init(&serv->alert_controller, NULL);
-
     pthread_mutex_init(&serv->mtx, NULL);
+
+    serv->main_thread = main;
 
     return serv;
 }
@@ -41,55 +43,69 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
     // Lock the mutex
     pthread_mutex_lock(&server->mtx);
 
-    while(server->queued >= server->size)
+    while(server->queued >= server->size && server->exiting == 0)
         pthread_cond_wait(&server->alert_controller, &server->mtx);
     
-    // Space available, insert it at the end of the cycle
-    
-    // Create a new JobInstance
-    JobInstance i = malloc(sizeof(*i));
-    
-    // Store the argvs of job
-    i->job_argv = job_argv; 
-    i->argc = job_argc;
-    // Store the socket
-    i->socket = job_socket;
 
-
-    // Make the JobID string
-    char* sid = my_itoa(server->total_jobs);
-    i->jobID = malloc((5+strlen(sid))*sizeof(char));
-    strcpy(i->jobID, "job_");
-    i->jobID = strcat(i->jobID, sid);
-    free(sid);
-
-    int pos = (server->front + server->queued) % server->size;
-    
-    server->job_queue[pos] = i;
-    
-    server->queued++;
-    server->total_jobs++;
-
-    int job_length = 0;
-    // Reconstruct job as a string
-    for(int j = 0; j < job_argc; j++)
-        job_length += strlen(job_argv[j] + 1);
-
-    char* job = malloc(sizeof(char) * job_length);
-    
-    strcpy(job,job_argv[0]);    
-    for(int j = 1; j < job_argc; j++)
+    char* response_message = NULL; 
+    if(server->exiting == 1)
     {
-        strcat(job, " ");
-        strcat(job, job_argv[j]);
+        // Exiting Occured, stopping
+        response_message = malloc(sizeof(char) * strlen("SERVER TERMINATED BEFORE EXECUTION\n") + 1);
+        strcpy(response_message, "SERVER TERMINATED BEFORE EXECUTION\n");
+    }
+    else
+    {
+        // Space available, insert it at the end of the cycle
+    
+        // Create a new JobInstance
+        JobInstance i = malloc(sizeof(*i));
+        
+        // Store the argvs of job
+        i->job_argv = job_argv; 
+        i->argc = job_argc;
+        // Store the socket
+        i->socket = job_socket;
+
+
+        // Make the JobID string
+        char* sid = my_itoa(server->total_jobs);
+        i->jobID = malloc((5+strlen(sid))*sizeof(char));
+        strcpy(i->jobID, "job_");
+        i->jobID = strcat(i->jobID, sid);
+        free(sid);
+
+        int pos = (server->front + server->queued) % server->size;
+        
+        server->job_queue[pos] = i;
+        
+        server->queued++;
+        server->total_jobs++;
+
+        int job_length = 0;
+        // Reconstruct job as a string
+        for(int j = 0; j < job_argc; j++)
+            job_length += strlen(job_argv[j] + 1);
+
+        char* job = malloc(sizeof(char) * job_length);
+        
+        strcpy(job,job_argv[0]);    
+        for(int j = 1; j < job_argc; j++)
+        {
+            strcat(job, " ");
+            strcat(job, job_argv[j]);
+        }
+
+
+        response_message  = malloc(strlen("JOB <, > SUBMITTED\n") + strlen(i->jobID) + strlen(job));
+        sprintf(response_message, "JOB <%s, %s> SUBMITTED\n", i->jobID, job);
+
+        printf("%d / %d", server->running_now, server->concurrency);
+        fflush(stdout);
+
     }
 
-
-    char* response_message  = malloc(strlen("JOB <, > SUBMITTED\n") + strlen(i->jobID) + strlen(job));
-    sprintf(response_message, "JOB <%s, %s> SUBMITTED\n", i->jobID, job);
-
-    printf("%d / %d", server->running_now, server->concurrency);
-    fflush(stdout);
+    
 
     int number_of_char_response = strlen(response_message) + 1;
 
@@ -154,7 +170,7 @@ char* server_stop(Server server, char* id)
             if (strcmp(server->job_queue[i]->jobID, id) == 0)
             {
                 // Destroy it
-                server->job_queue[i] = NULL;
+                server->job_queue[pos] = NULL;
                 // Reorder the positioning so it is continius again
                 for(int j = i; j < server->queued; j++)
                 {
@@ -194,15 +210,17 @@ char* server_poll(Server server)
     char** poll_buffer = malloc(sizeof(char *) * server->queued);
     int total_length = 0;
 
+    printf("check\n");
+    fflush(stdout);
 
-    for(int i = 0; server->queued > i; i++)
+    for(int i = 0; i < server->queued; i++)
     {
         JobInstance job = server->job_queue[(server->front + i) % server->size];
         
         int job_length = 0;
         // Reconstruct job as a string
         for(int j = 0; j < job->argc; j++)
-            job_length += strlen(job->job_argv[j] + 1);
+            job_length += strlen(job->job_argv[j]) + 1;
 
         char* argv_str = malloc(sizeof(char) * job_length);
     
@@ -222,11 +240,26 @@ char* server_poll(Server server)
         free(argv_str);
     }
 
-    char* response = malloc(sizeof(char) * (total_length + 1));    
-    strcpy(response, poll_buffer[0]);
+    printf("check\n");
+    fflush(stdout);
 
-    for(int i = 1; i < server->queued; i++)
-        strcat(response, poll_buffer[i]);
+    char* response;
+
+    if(total_length == 0)
+    {
+        response = malloc(sizeof(char) * (strlen("NO JOB AT QUEUE\n") + 1));
+        strcpy(response, "NO JOB AT QUEUE\n");
+    }
+    else
+    {
+        response = malloc(sizeof(char) * (total_length + 1));    
+        strcpy(response, poll_buffer[0]);
+        for(int i = 1; i < server->queued; i++)
+            strcat(response, poll_buffer[i]);
+    }
+
+    printf("check\n");
+    fflush(stdout);
 
 
     pthread_mutex_unlock(&server->mtx);
@@ -236,8 +269,61 @@ char* server_poll(Server server)
 
 }
 
-char* server_exit()
+char* server_exit(Server server)
 {
+    pthread_mutex_lock(&server->mtx);
+
+    pthread_cancel(&server->main_thread);
+    // Indicate Exiting status
+    server->exiting = 1;
+
+    // Stop all queued jobs
+    for(int i = 0; i < server->size; i++)
+    {
+        char* response_message = "SERVER TERMINATED BEFORE EXECUTION\n";
+        int number_of_char_response = strlen(response_message) + 1;
+
+        if(server->job_queue[i] != NULL)
+        {
+            int sock = server->job_queue[i]->socket;
+            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+
+            // If we have arguments to send aswell
+            if(number_of_char_response !=0)
+            {
+                // Send them using our private communication
+                if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
+                {
+                    perror("write");
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            number_of_char_response = 0;
+
+            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+        
+            // Destroy the job
+            
+            server->job_queue[i] = NULL;
+        }
+    }
+    server->front = 0;
+    server->queued = 0;
+    
+
+    // Wake-up everyone to let thme know we are exiting
+    pthread_cond_broadcast(&server->alert_controller);
+    pthread_cond_broadcast(&server->alert_worker);
+
     char* response = malloc(sizeof(char) * (strlen("SERVER TERMINATED\n") + 1));
     sprintf(response, "SERVER TERMINATED\n");
     return response;
@@ -255,9 +341,14 @@ JobInstance server_getJob(Server server)
 
     server->running_now--;
 
-    while(server->queued == 0 || server->concurrency <= server->running_now)
+    while((server->queued == 0 || server->concurrency <= server->running_now) && server->exiting == 0)
         pthread_cond_wait(&server->alert_worker, &server->mtx);
-        
+    
+    if(server->exiting == 1)
+    {
+        return NULL;
+    }
+
     JobInstance job = server->job_queue[server->front];
 
     server->job_queue[server->front] =  NULL;

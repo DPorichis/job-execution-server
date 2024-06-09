@@ -1,6 +1,6 @@
 #pragma once
 #include <pthread.h>
-
+#include <netinet/in.h>
 
 // Basic enumeration used to pass the command type in request
 enum command{
@@ -35,6 +35,7 @@ typedef struct job_instance* JobInstance;
 // A total representation of server
 struct server
 {
+    // Buffer Info (LOCK REQUIRED)
     JobInstance* job_queue;
     int concurrency;
     int running_now;
@@ -44,16 +45,22 @@ struct server
     int total_jobs;
     int exiting;
 
+    // Sync Control
     pthread_mutex_t mtx;
-
     pthread_cond_t alert_worker;
     pthread_cond_t alert_controller;
-    
+
+    // Connection Info (LOCK IS NOT REQUIRED)
+    pthread_t main_thread;
+    int port, sock;
+    struct sockaddr_in serv, client;
+    socklen_t clientlen;
+
 };
 
 typedef struct server* Server;
 
-Server server_create(int bufsize, int concurrency, int worker_num);
+Server server_create(int bufsize, int concurrency, int worker_num, pthread_t main);
 
 char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket);
 
@@ -62,5 +69,7 @@ char* server_setConcurrency(Server server, int new_conc);
 char* server_stop(Server server, char* id);
 
 char* server_poll(Server server);
+
+char* server_exit(Server server);
 
 JobInstance server_getJob(Server server);

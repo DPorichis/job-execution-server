@@ -16,45 +16,40 @@
 #include "controller.h"
 #include "worker.h"
 
-Server serv = NULL;
+Server server = NULL;
 
 int main(int argc, char* argv[])
 {
-
-    int port, sock, newsock;
-    struct sockaddr_in server, client;
-    socklen_t clientlen;
-
-    struct sockaddr *serverptr = (struct sockaddr *)&server;
-    struct sockaddr *clientptr = (struct sockaddr *)&client;
-    struct hostent *rem;
-
     if (argc != 4)
     {
         perror("Wrong Use");
         exit(EXIT_FAILURE);
     }
 
-    port = my_atoi(argv[1]);
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    int buffer_size = my_atoi(argv[2]);
+    int threadpoolsize = my_atoi(argv[3]);
+    server = server_create(buffer_size, 1, threadpoolsize, pthread_self());
+
+    struct sockaddr *serverptr = (struct sockaddr *)&server->serv;
+    struct sockaddr *clientptr = (struct sockaddr *)&server->client;
+    struct hostent *rem;
+
+    server->port = my_atoi(argv[1]);
+    if ((server->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("socket");
         exit(EXIT_FAILURE);
     }
 
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(port);
-
-    int threadpoolsize = my_atoi(argv[3]);
-
-    serv = server_create(my_atoi(argv[2]), 1, threadpoolsize);
+    server->serv.sin_family = AF_INET;
+    server->serv.sin_addr.s_addr = htonl(INADDR_ANY);
+    server->serv.sin_port = htons(server->port);
 
     for(int i = 0; i < threadpoolsize; i++)
     {
         pthread_t thr;
         int err;
-        if(err = pthread_create(&thr, NULL, wrapper_worker, serv))
+        if(err = pthread_create(&thr, NULL, wrapper_worker, server))
         {
             fprintf(stderr, "pthread create");
             exit(1);
@@ -62,22 +57,25 @@ int main(int argc, char* argv[])
     }
 
 
-    if(bind(sock, serverptr, sizeof(server)) < 0)
+    if(bind(server->sock, serverptr, sizeof(*serverptr)) < 0)
     {
         perror("bind");
         exit(EXIT_FAILURE);
     }
 
-    if(listen(sock, 10) < 0)
+    if(listen(server->sock, 10) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    printf("Now listening for connections to port %d\n", port);
+
+
+    printf("Now listening for connections to port %d\n", server->port);
+    int newsock;
 
     while(1)
     {
-        if ((newsock = accept(sock, clientptr, &clientlen)) < 0)
+        if ((newsock = accept(server->sock, clientptr, &server->clientlen)) < 0)
         {
             perror("accept");
             exit(EXIT_FAILURE);
@@ -88,7 +86,7 @@ int main(int argc, char* argv[])
         int err, status;
 
         ControllerArgs args = malloc(sizeof(*args));
-        args->server = serv;
+        args->server = server;
         args->sock = newsock;
 
         if(err = pthread_create(&thr, NULL, wrapper_controller, args))

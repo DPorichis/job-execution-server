@@ -67,19 +67,19 @@ int controller(Server server, int sock)
             response_message = server_stop(server, request_argv[0]);
             break;
         case POLL:;
-            server_poll(server);
+            response_message = server_poll(server);
             break;
         case EXIT:
-            response_message = "jobExecutorServer terminated\n";
+            response_message = server_exit(server);
             break;
         default:
             // That doesn't seem right
             response_message = "Unexpected Error\n";           
     }
 
+    // For ISSUE_JOB let the functions communicate with the server
     if(cmd != ISSUE_JOB)
     {
-
         number_of_char_response = strlen(response_message) + 1;
 
         if(write(sock, &number_of_char_response, sizeof(int)) < 0)
