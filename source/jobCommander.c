@@ -1,5 +1,6 @@
-// JobCommander code for project 2
-// Dimitris-Stefanos Porichis
+// jobCommander.c : Contains the implementation of the client
+
+// NOTE: The majority of code is reused from project 1
 
 #include <stdio.h>
 #include <unistd.h>
@@ -22,15 +23,16 @@
 
 int main(int argc, char* argv[])
 {
-    
+
+    // Reject basic mistakes in syntax
+    // And assign the corresponding code of the command
+
     if(argc < 4)
     {
         printf("Wrong use, try again\n");
         return -2;
     }
 
-    // Reject basic mistakes in syntax
-    // And assign the corresponding code of the command
     enum command cmd;
     if(strcmp(argv[3], "issueJob") == 0)
     {
@@ -83,8 +85,9 @@ int main(int argc, char* argv[])
         exit(-2);
     }
 
-    // Connect to server
-
+    // Time to connect to the server and send our request
+    
+    // -- From lecture code --
     int port, sock, i;
     char bud[256];
 
@@ -103,14 +106,10 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    port = my_atoi(argv[2]);
+    port = my_atoi(argv[2]); // Port specified by our user
     server.sin_family = AF_INET;
     memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
     server.sin_port = htons(port);
-
-    // printf("Connecting to %s port %d\n", argv[1], port);
-    // fflush(stdout);
-
 
     if(connect(sock, serverptr, sizeof(server)) < 0)
     {
@@ -148,21 +147,21 @@ int main(int argc, char* argv[])
         command_argc = argc - 4;
 
     }
-
+    // Copy the request information to their according spots in the request table
     memcpy(request, &command_argc, sizeof(int));
     memcpy(request+1, &number_of_characters, sizeof(int));
     memcpy(request+2, &cmd, sizeof(enum command));
     
+    // Send out the request
     if(write(sock, request, sizeof(request)) < 0)
     {
         perror("write");
         exit(EXIT_FAILURE);
     }
 
-    // If we have arguments to send aswell
+    // And the string representation of the rest of the arguments (if we have any)
     if(number_of_characters !=0)
     {
-        // Send them using our private communication
         if(write(sock, transmit, number_of_characters*sizeof(char)) < 0)
         {
             perror("write");
@@ -171,7 +170,9 @@ int main(int argc, char* argv[])
         free(transmit);
     }
 
-    // Wait for server's response
+    // Now we wait for server's response
+
+    // Optain the length of the response
     int response_size = 0;
     if(read(sock, &response_size, sizeof(int)) < 0)
     {
@@ -179,7 +180,7 @@ int main(int argc, char* argv[])
         exit(5);
     }
     
-    // If server has a message to deliver
+    // If there is a message optain it as well
     if(response_size!=0)
     {
         // Read it and print it out
@@ -193,21 +194,24 @@ int main(int argc, char* argv[])
         free(response);
     }    
 
+    // For issue job commands we will need the output of the job
     if(cmd == ISSUE_JOB)
     {
-        // Read the result of the command aswell
-        // Wait for server's response
+        // The output will be sent in packs of 256-characters
+        // As the size may be too big for one continuous message
         do
         {
             char buffer[257];
             response_size = 0;
+
+            // Optain how many actual characters are in this pack
             if(read(sock, &response_size, sizeof(int)) < 0)
             {
                 perror("problem in reading");
                 exit(5);
             }
+            // Place a Null byte in the buffer so we can print the contain without issues
             buffer[response_size] = '\0';
-            // If server has a message to deliver
             if(response_size!=0)
             {
                 // Read it and print it out
@@ -218,6 +222,7 @@ int main(int argc, char* argv[])
                 }
                 printf("%s", buffer);
             }
+        // If we recieve a size of zero the message is over
         }while (response_size != 0);
         
     }
@@ -226,8 +231,6 @@ int main(int argc, char* argv[])
     // Clean and exit
 
     close(sock);
-
     return 0;
-
 }
 

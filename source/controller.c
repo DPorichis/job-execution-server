@@ -1,10 +1,10 @@
+// controller.c : Contains the function used by the controller
+// threads (and its wrapper)
+
 #include "controller.h"
 #include "utils.h"
 
 #include <string.h>
-
-// Functions implementing server opperation
-// not public facing thus not included in controller.h
 
 int controller(Server server, int sock)
 {
@@ -28,6 +28,7 @@ int controller(Server server, int sock)
     // If we have arguments to read aswell
     if(request_char_num !=0)
     {
+        // Retrive the string representation of the job
         command_string = malloc(request_char_num);
         printf("%d\n", request_char_num);
         if(read(sock, command_string, request_char_num * sizeof(char)) < 0)
@@ -36,6 +37,7 @@ int controller(Server server, int sock)
             exit(EXIT_FAILURE);
         }
 
+        // Recreate an argv table representation
         request_argv = malloc(sizeof(char*)*(request_argc + 1));
         int offset = 0;
         for(int i = 0; i < request_argc; i++)
@@ -48,11 +50,13 @@ int controller(Server server, int sock)
         }
         request_argv[request_argc] = NULL;
         
-        // for(int i = 0; i < request_argc; i++)
-        //     printf("%s ", request_argv[i]);
-        // printf("\n");  
 
     }
+    
+    // Depending on the type of the request, call the relevant server_*function*
+    // Note: These functions contain locking logic, the caller may be suspended
+    // for arbitrary time due to these locks.
+
     char* response_message = NULL;
     int number_of_char_response = 0;
     switch (cmd) 
@@ -77,21 +81,22 @@ int controller(Server server, int sock)
             response_message = "Unexpected Error\n";           
     }
 
-    // For ISSUE_JOB let the functions communicate with the server
+    // For ISSUE_JOB the server_issueJob function will communicate with the client,
+    // For all the other commands, we need to send the message ourselves
     if(cmd != ISSUE_JOB)
     {
         number_of_char_response = strlen(response_message) + 1;
 
+        // Send out the length of the response
         if(write(sock, &number_of_char_response, sizeof(int)) < 0)
         {
             perror("write");
             exit(EXIT_FAILURE);
         }
 
-        // If we have arguments to send aswell
+        // And the response itself
         if(number_of_char_response !=0)
         {
-            // Send them using our private communication
             if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
             {
                 perror("write");
@@ -104,6 +109,8 @@ int controller(Server server, int sock)
 
 }
 
+
+// Wrapper function for dereferencing the arguments.
 void* wrapper_controller(void * arg)
 {
     ControllerArgs cntrl = arg;

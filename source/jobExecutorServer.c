@@ -1,3 +1,6 @@
+// jobExecutorServer.c : Contains the implementation of the server's
+// main thread.
+
 #include <stdio.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -10,7 +13,6 @@
 #include <signal.h>
 #include <pthread.h>
 #include <string.h>
-
 
 #include "helpfunc.h"
 #include "utils.h"
@@ -29,16 +31,22 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    // Setting up the termination signal
+    // Setting up the exiting signal
     static struct sigaction act_child_term;
     act_child_term.sa_handler = handle_exiting;
     sigfillset(&(act_child_term.sa_mask));
     sigaction(SIGUSR1, &act_child_term, NULL);
 
+    // Understanding the argumentss
     int buffer_size = my_atoi(argv[2]);
     int threadpoolsize = my_atoi(argv[3]);
+
+    // Setting up the server structure
     server = server_create(buffer_size, 1, threadpoolsize, pthread_self());
 
+
+    // Creating the listening socket
+    // -- From Lecture code --
     struct sockaddr *serverptr = (struct sockaddr *)&server->serv;
     struct sockaddr *clientptr = (struct sockaddr *)&server->client;
     struct hostent *rem;
@@ -54,6 +62,7 @@ int main(int argc, char* argv[])
     server->serv.sin_addr.s_addr = htonl(INADDR_ANY);
     server->serv.sin_port = htons(server->port);
 
+    // Creating our worker threads
     for(int i = 0; i < threadpoolsize; i++)
     {
         pthread_t thr;
@@ -63,9 +72,10 @@ int main(int argc, char* argv[])
             fprintf(stderr, "pthread create");
             exit(1);
         }
-        pthread_detach(thr);
+        pthread_detach(thr); // We won't join them
     }
 
+    // Final setting up 
 
     if(bind(server->sock, serverptr, sizeof(*serverptr)) < 0)
     {
@@ -83,7 +93,7 @@ int main(int argc, char* argv[])
     printf("Now listening for connections to port %d\n", server->port);
     int newsock;
 
-    // Creating a signal set that includes only SIGCHLD
+    // Creating a signal set that includes only SIGUSR1
     // to activate while we are in critical parts
     sigset_t ignore_child;
     sigemptyset(&ignore_child);
@@ -91,8 +101,10 @@ int main(int argc, char* argv[])
 
     while(1)
     {
+        // Let the signal interrupt us if exit occurs
         sigprocmask(SIG_UNBLOCK, &ignore_child, NULL);
 
+        // Wait for a client
         if ((newsock = accept(server->sock, clientptr, &server->clientlen)) < 0)
         {
             perror("accept");
@@ -100,11 +112,10 @@ int main(int argc, char* argv[])
         }
         printf("Connection Accepted\n");
 
-        
-        
         pthread_t thr;
         int err, status;
 
+        // Create arguments for the controller thread
         ControllerArgs args = malloc(sizeof(*args));
         args->server = server;
         args->sock = newsock;
@@ -114,6 +125,7 @@ int main(int argc, char* argv[])
 
         pthread_mutex_lock(&server->mtx);
 
+        // Assign the client to a worker thread
         if(err = pthread_create(&thr, NULL, wrapper_controller, args))
         {
             fprintf(stderr, "pthread create");
@@ -122,7 +134,7 @@ int main(int argc, char* argv[])
         // The worker threads are stand-alone
         pthread_detach(thr);
 
-        server->alive_threads++;
+        server->alive_threads++; // Update the number of threads alive
 
         pthread_mutex_unlock(&server->mtx);
 

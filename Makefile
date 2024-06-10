@@ -5,7 +5,6 @@ TESTS = ./tests
 BUILD = ./build
 BIN = ./bin
 
-# Compile options. Το -I<dir> λέει στον compiler να αναζητήσει εκεί include files
 CFLAGS = -g -I$(HEAD)
 
 # Αρχεία .o

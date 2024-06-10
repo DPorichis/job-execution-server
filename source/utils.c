@@ -1,3 +1,6 @@
+// utils.c: Contains the implimentation of core server functions.
+// All the heavy-lifting of locking logic is here
+
 #include "utils.h"
 #include "helpfunc.h"
 
@@ -13,42 +16,50 @@
 #include <ctype.h>
 #include <signal.h>
 
+// Creates a server representation with the specifications given as arguments
 Server server_create(int bufsize, int concurrency, int worker_num, pthread_t main)
 {
     Server serv = malloc(sizeof(*serv));
-    serv->front = 0;
-    serv->queued = 0;
-    serv->running_now = worker_num;
-    serv->total_jobs = 1;
-    serv->size = bufsize;
-    serv->concurrency = concurrency;
-    serv->exiting = 0;
-    serv->main_thread = 0;
-    serv->alive_threads = worker_num;
 
+    // Setting up the buffer
     serv->job_queue = malloc(sizeof(JobInstance)*bufsize);
     for(int i = 0; i < bufsize; i++)
         serv->job_queue[i] = NULL;
-    
+
+    serv->size = bufsize; // Size of the buffer
+    serv->front = 0; // First job is at pos 0
+    serv->queued = 0; // The buffer is empty
+    serv->total_jobs = 1; // The ids start from 1
+
+    serv->running_now = worker_num; // All the worker threads are running
+    serv->concurrency = concurrency;
+
+    serv->exiting = 0; // We are not exiting
+    serv->alive_threads = worker_num; // Number of active threads in the process
+
+    // Initializing condition variables and the mutex
     pthread_cond_init(&serv->alert_worker, NULL);
     pthread_cond_init(&serv->alert_controller, NULL);
     pthread_cond_init(&serv->alert_exiting, NULL);
     pthread_mutex_init(&serv->mtx, NULL);
 
-    serv->main_thread = main;
+    serv->main_thread = main; // Storing main thread to signal exiting when needed
 
     return serv;
 }
 
 char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket)
 {
-    // Lock the mutex
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
+    // If there is no storage available to store the job, and we are not exiting
+    // sleep untill someone alerts us.
     while(server->queued >= server->size && server->exiting == 0)
         pthread_cond_wait(&server->alert_controller, &server->mtx);
     
-    char* response_message = NULL; 
+    char* response_message = NULL;
+
     if(server->exiting == 1)
     {
         // Exiting Occured, stopping
@@ -56,9 +67,7 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
         strcpy(response_message, "SERVER TERMINATED BEFORE EXECUTION\n");
     }
     else
-    {
-        // Space available, insert it at the end of the cycle
-    
+    {    
         // Create a new JobInstance
         JobInstance i = malloc(sizeof(*i));
         
@@ -76,15 +85,16 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
         i->jobID = strcat(i->jobID, sid);
         free(sid);
 
+        // Insert the job at the end of the buffer
         int pos = (server->front + server->queued) % server->size;
-        
         server->job_queue[pos] = i;
         
+        // Update the counters
         server->queued++;
         server->total_jobs++;
 
+        // Reconstruct job as a string for the response message
         int job_length = 0;
-        // Reconstruct job as a string
         for(int j = 0; j < job_argc; j++)
             job_length += strlen(job_argv[j] + 1);
 
@@ -97,26 +107,21 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
             strcat(job, job_argv[j]);
         }
 
-
+        // Formating the respones
         response_message  = malloc(strlen("JOB <, > SUBMITTED\n") + strlen(i->jobID) + strlen(job));
         sprintf(response_message, "JOB <%s, %s> SUBMITTED\n", i->jobID, job);
-
-        printf("%d / %d", server->running_now, server->concurrency);
-        fflush(stdout);
-
     }
 
     
-
+    // Delivering the response length to client
     int number_of_char_response = strlen(response_message) + 1;
-
     if(write(job_socket, &number_of_char_response, sizeof(int)) < 0)
     {
         perror("write");
         exit(EXIT_FAILURE);
     }
 
-    // If we have arguments to send aswell
+    // And the response itself
     if(number_of_char_response !=0)
     {
         // Send them using our private communication
@@ -127,13 +132,18 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
         }
     }
 
+    // If there is space availabe for execution, alert a worker to take the job
     if(server->running_now < server->concurrency)
         pthread_cond_signal(&server->alert_worker);
 
-    server->alive_threads--;
+    server->alive_threads--; // Note that we are done as a thread
+
+    // If the server is on an exiting status and we where the last thread standing,
+    // alert the exiting function that we are done
     if(server->alive_threads == 0 && server->exiting == 1)
         pthread_cond_signal(&server->alert_exiting);
 
+    // End of accessing shared data
     pthread_mutex_unlock(&server->mtx);
 
     return response_message;
@@ -142,22 +152,30 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
 
 char* server_setConcurrency(Server server, int new_conc)
 {
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
-    server->concurrency = new_conc;
+    server->concurrency = new_conc; // set new concurrency
 
+    // If we have bigger concurrency than before and there are jobs queued
+    // alert all waiting workers for a chance to get a job
     if(server->running_now < server->concurrency && server->queued != 0)
-        pthread_cond_signal(&server->alert_worker);
-    pthread_mutex_unlock(&server->mtx);
+        pthread_cond_broadcast(&server->alert_worker);
+    
+    server->alive_threads--; // Note that we are done as a thread
 
-    char* conc_string = my_itoa(new_conc);
-    char* response_message  = malloc(strlen("CONCURRENCY SET AT ") + strlen(conc_string) + 1);
-
-    sprintf(response_message, "CONCURRENCY SET AT %s\n", conc_string);
-
-    server->alive_threads--;
+    // If the server is on an exiting status and we where the last thread standing,
+    // alert the exiting function that we are done
     if(server->alive_threads == 0 && server->exiting == 1)
         pthread_cond_signal(&server->alert_exiting);
+
+    // End of accessing shared data
+    pthread_mutex_unlock(&server->mtx);
+
+    // Construct and return the response
+    char* conc_string = my_itoa(new_conc);
+    char* response_message  = malloc(strlen("CONCURRENCY SET AT ") + strlen(conc_string) + 1);
+    sprintf(response_message, "CONCURRENCY SET AT %s\n", conc_string);
 
     return response_message;
 }
@@ -165,16 +183,18 @@ char* server_setConcurrency(Server server, int new_conc)
 
 char* server_stop(Server server, char* id)
 {
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
     char* response_message = NULL;
     
+    // Search all the queued jobs
     for(int i = 0; i < server->queued; i++)
     {
         int pos = (server->front + i) % server->size;
-        
         if (server->job_queue[pos] != NULL)
         {
+            // To find the requested jobID
             if (strcmp(server->job_queue[i]->jobID, id) == 0)
             {
                 // Destroy it
@@ -187,6 +207,7 @@ char* server_stop(Server server, char* id)
                     server->job_queue[pos] = server->job_queue[mov_pos];
                     server->job_queue[mov_pos] = NULL;
                 }
+                // Construct the response
                 response_message = malloc(sizeof(char) * (strlen(id) + strlen("JOB <> REMOVED\n")));
                 sprintf(response_message, "JOB <%s> REMOVED\n", id);
             
@@ -196,19 +217,26 @@ char* server_stop(Server server, char* id)
         }
     }    
     
+    // If the job wasn't found
     if(response_message == NULL)
     {
+        // Construct failure response
         response_message = malloc(sizeof(char) * (strlen(id) + strlen("JOB <> NOTFOUND\n")));
         sprintf(response_message, "JOB <%s> NOTFOUND\n", id);
     }
 
+    // If the buffer was full before this deletion, alert a waiting controller to place a job
     if(server->size - 1 != server->queued)
         pthread_cond_signal(&server->alert_controller);
 
-    server->alive_threads--;
+    server->alive_threads--; // Note that we are done as a thread
+
+    // If the server is on an exiting status and we where the last thread standing,
+    // alert the exiting function that we are done
     if(server->alive_threads == 0 && server->exiting == 1)
         pthread_cond_signal(&server->alert_exiting);
-    
+
+    // End of accessing shared data
     pthread_mutex_unlock(&server->mtx);
     
     return response_message;
@@ -217,19 +245,19 @@ char* server_stop(Server server, char* id)
 
 char* server_poll(Server server)
 {
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
     
+    // Create a table to store the string tupples of the jobs
     char** poll_buffer = malloc(sizeof(char *) * server->queued);
     int total_length = 0;
 
-    printf("check\n");
-    fflush(stdout);
-
+    // For every job queued
     for(int i = 0; i < server->queued; i++)
     {
         JobInstance job = server->job_queue[(server->front + i) % server->size];
-        
         int job_length = 0;
+
         // Reconstruct job as a string
         for(int j = 0; j < job->argc; j++)
             job_length += strlen(job->job_argv[j]) + 1;
@@ -243,20 +271,19 @@ char* server_poll(Server server)
             strcat(argv_str, job->job_argv[j]);
         }
 
-
+        // Format the tupple
         char* response_message  = malloc(strlen("<, >\n") + strlen(job->jobID) + strlen(argv_str));
         sprintf(response_message, "<%s, %s>\n", job->jobID, argv_str);
 
+        // And store it in the buffer
         poll_buffer[i] = response_message;        
         total_length += strlen(response_message);
         free(argv_str);
     }
 
-    printf("check\n");
-    fflush(stdout);
-
     char* response;
 
+    // If no jobs where found return the empty message
     if(total_length == 0)
     {
         response = malloc(sizeof(char) * (strlen("NO JOB AT QUEUE\n") + 1));
@@ -264,21 +291,22 @@ char* server_poll(Server server)
     }
     else
     {
+        // If jobs where found create a response containing all the job tupples
         response = malloc(sizeof(char) * (total_length + 1));    
         strcpy(response, poll_buffer[0]);
         for(int i = 1; i < server->queued; i++)
             strcat(response, poll_buffer[i]);
     }
 
-    printf("check\n");
-    fflush(stdout);
+    server->alive_threads--; // Note that we are done as a thread
 
-    server->alive_threads--;
+    // If the server is on an exiting status and we where the last thread standing,
+    // alert the exiting function that we are done
     if(server->alive_threads == 0 && server->exiting == 1)
         pthread_cond_signal(&server->alert_exiting);
 
+    // End of accessing shared data
     pthread_mutex_unlock(&server->mtx);
-
 
     return response;
 
@@ -286,15 +314,19 @@ char* server_poll(Server server)
 
 char* server_exit(Server server)
 {
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
-    pthread_kill(server->main_thread, SIGUSR1);
-    // Indicate Exiting status
-    server->exiting = 1;
+    pthread_kill(server->main_thread, SIGUSR1); // Signal the mainthread to start the exiting process
+    
+    server->exiting = 1; // Indicate Exiting status
 
     server->alive_threads--;
+    
+    // End of accessing shared data
     pthread_mutex_unlock(&server->mtx);
 
+    // Create the response string and return it
     char* response = malloc(sizeof(char) * (strlen("SERVER TERMINATED\n") + 1));
     sprintf(response, "SERVER TERMINATED\n");
     return response;
@@ -303,28 +335,27 @@ char* server_exit(Server server)
 
 void server_destroy(Server server)
 {
+    // Free up the job_queue
     free(server->job_queue);
 
+    // Destroy the conditions and mutex
     pthread_cond_destroy(&server->alert_worker);
     pthread_cond_destroy(&server->alert_controller);
     pthread_cond_destroy(&server->alert_exiting);
     pthread_mutex_destroy(&server->mtx);
 
+    // Free the struct itself
     free(server);
 
 }
 
 JobInstance server_getJob(Server server)
 {
-    printf("Checking for a job...\n");
-    fflush(stdout);
-
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
+    // If we are searching for a job, we are not a running worker
     server->running_now--;
-
-    printf("locked the mutex with running threads %d...\n", server->alive_threads);
-    fflush(stdout);
 
     while((server->queued == 0 || server->concurrency <= server->running_now) && server->exiting == 0)
         pthread_cond_wait(&server->alert_worker, &server->mtx);
