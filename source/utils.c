@@ -357,31 +357,40 @@ JobInstance server_getJob(Server server)
     // If we are searching for a job, we are not a running worker
     server->running_now--;
 
+    // If a job is available and we have permission to take it OR we are exiting
     while((server->queued == 0 || server->concurrency <= server->running_now) && server->exiting == 0)
         pthread_cond_wait(&server->alert_worker, &server->mtx);
     
+    // If server is exiting is time to terminate
     if(server->exiting == 1)
     {
-        server->alive_threads--;
-        printf("Alive threads: %d\n", server->alive_threads);
-        fflush(stdout);
+        server->alive_threads--; // Note that we are done as a thread
+
+        // If the server is on an exiting status and we where the last thread standing,
+        // alert the exiting function that we are done
+
         if(server->alive_threads == 0)
             pthread_cond_signal(&server->alert_exiting);
+        
+        // End of accessing shared data
         pthread_mutex_unlock(&server->mtx);
         return NULL;
     }
 
+    // Get the first job available
     JobInstance job = server->job_queue[server->front];
 
+    // Mark the spot as empty and shift the front
     server->job_queue[server->front] =  NULL;
     server->front = (server->front + 1) % server->size;
-
     server->queued--;
+
+    // Mark that a job is now running
     server->running_now++;
 
-
+    // If the buffer was full before, let a waiting controller know that he can store a job
     if(server->size - 1 == server->queued)
-        pthread_cond_signal(&server->alert_controller); 
+        pthread_cond_signal(&server->alert_controller);
     pthread_mutex_unlock(&server->mtx);
 
     return job;

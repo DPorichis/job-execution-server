@@ -21,16 +21,17 @@ int worker(Server server)
     while(1)
     {
     
-        // THIS IS NOT BUSY WAITING
+        // Get a job from the buffer
         JobInstance to_execute = server_getJob(server);
         
-        if(to_execute == NULL)
+        if(to_execute == NULL) // NULL indicates server termination
         {
+            // Exit as a thread
             pthread_cond_broadcast(&server->alert_controller);
             pthread_exit(0);
         }
 
-        //Do the funny with the execution
+        // Execute the job that was assigned
         
         pid_t childpid = fork();
         if(childpid == -1)
@@ -40,7 +41,6 @@ int worker(Server server)
         }
         if(childpid == 0)
         {
-
             // Setup output redirection
             int output_file;
             char name[100];
@@ -51,6 +51,7 @@ int worker(Server server)
                 perror("creating");
                 exit(1);
             }
+            // Write out the starting tag
             char buffer[256];
             int used = sprintf(buffer, "-----%s output start-----\n", to_execute->jobID);
             if (write(output_file, buffer, used) < 0)
@@ -59,9 +60,10 @@ int worker(Server server)
                 exit(EXIT_FAILURE);
             }
 
+            // Over-ride the stdout to the file
             dup2(output_file, 1);
             
-            // Execute the command girl
+            // Execute the command specified by the job
             if(execvp(to_execute->job_argv[0], &to_execute->job_argv[0]) == -1)
             {
                 perror("execve");
@@ -71,6 +73,7 @@ int worker(Server server)
 
         // Only the parent process will reach this part of the code
         int status;
+        // Wait for the job to finish
         if ((childpid = waitpid(childpid, NULL, 0)) == -1 ) {
             perror ("wait failed"); exit(2);
         }
@@ -86,8 +89,8 @@ int worker(Server server)
             exit(1);
         }
         
+        // Writting the end tag at the end of the file
         lseek(output_file, 0, SEEK_END);
-
         char buffer[256];
         int used = sprintf(buffer, "-----%s output end-----\n", to_execute->jobID);
         if (write(output_file, buffer, used) < 0)
@@ -96,23 +99,27 @@ int worker(Server server)
             exit(EXIT_FAILURE);
         }
 
+        // Read it from the start
         lseek(output_file, 0, SEEK_SET);
         int transmit_size;
+        // Read a max of 256 charachters at a time
         while((transmit_size = read(output_file, buffer, 256)) > 0)
         {
             printf("Transmiting %d characters\n", transmit_size);
+            // Transmit the length of the message
             if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
             {
                 perror("write");
                 exit(EXIT_FAILURE);
             }
-
+            // Transmit the message
             if(write(to_execute->socket, buffer, transmit_size*sizeof(char)) < 0)
             {
                 perror("write");
                 exit(EXIT_FAILURE);
             }
         }
+        // Send out 0 length to indicate end of message
         transmit_size = 0;
         if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
         {
@@ -120,6 +127,7 @@ int worker(Server server)
             exit(EXIT_FAILURE);
         }
         
+        // Close everything and move to the next job
         close(to_execute->socket);
         close(output_file);
         unlink(name);    

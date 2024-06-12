@@ -147,16 +147,20 @@ int main(int argc, char* argv[])
 
 void handle_exiting(int sig)
 {
+    // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
     // Stop all queued jobs
     for(int i = 0; i < server->size; i++)
     {
+        // The message that will be sent to the waiting clients
         char* response_message = "SERVER TERMINATED BEFORE EXECUTION\n";
         int number_of_char_response = strlen(response_message) + 1;
 
+        // For every actual job
         if(server->job_queue[i] != NULL)
         {
+            // Send message length to client
             int sock = server->job_queue[i]->socket;
             if(write(sock, &number_of_char_response, sizeof(int)) < 0)
             {
@@ -164,7 +168,7 @@ void handle_exiting(int sig)
                 exit(EXIT_FAILURE);
             }
 
-            // If we have arguments to send aswell
+            // And the termination message
             if(number_of_char_response !=0)
             {
                 // Send them using our private communication
@@ -175,39 +179,36 @@ void handle_exiting(int sig)
                 }
             }
 
+            // Indicate end of communication
             number_of_char_response = 0;
-
             if(write(sock, &number_of_char_response, sizeof(int)) < 0)
             {
                 perror("write");
                 exit(EXIT_FAILURE);
             }
         
-            // Destroy the job
+            //! Destroy the job
             
             server->job_queue[i] = NULL;
         }
     }
     server->front = 0;
     server->queued = 0;
-
-    printf("Letting all paused threads know we are exiting\n");
-    fflush(stdout);
     
-    // Wake-up everyone to let thme know we are exiting
+    // Wake-up everyone to let them know we are exiting
     pthread_cond_broadcast(&server->alert_controller);
     pthread_cond_broadcast(&server->alert_worker);
 
+    // Waiting for all threads to stop
     while(server->alive_threads != 0)
     {
         printf("%d threads still alive\n", server->alive_threads);
         fflush(stdout);
         pthread_cond_wait(&server->alert_exiting, &server->mtx);
     }
+
     // Everyone left, lets destroy that thing
-
     close(server->sock);
-
     pthread_mutex_unlock(&server->mtx);
 
     printf("main thread exiting\n");
