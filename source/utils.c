@@ -48,7 +48,7 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
     return serv;
 }
 
-char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket)
+int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket)
 {
     // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
@@ -110,6 +110,8 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
         // Formating the respones
         response_message  = malloc(strlen("JOB <, > SUBMITTED\n") + strlen(i->jobID) + strlen(job));
         sprintf(response_message, "JOB <%s, %s> SUBMITTED\n", i->jobID, job);
+
+        free(job);
     }
 
     
@@ -132,6 +134,8 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
         }
     }
 
+    free(response_message);
+
     // If there is space availabe for execution, alert a worker to take the job
     if(server->running_now < server->concurrency)
         pthread_cond_signal(&server->alert_worker);
@@ -146,7 +150,7 @@ char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_soc
     // End of accessing shared data
     pthread_mutex_unlock(&server->mtx);
 
-    return response_message;
+    return 0;
 
 }
 
@@ -197,8 +201,10 @@ char* server_stop(Server server, char* id)
             // To find the requested jobID
             if (strcmp(server->job_queue[pos]->jobID, id) == 0)
             {
-                // Destroy it
+                // Destroy it                
+                destroy_instance(server->job_queue[pos]);
                 server->job_queue[pos] = NULL;
+
                 // Reorder the positioning so it is continius again
                 for(int j = i; j < server->queued; j++)
                 {
@@ -297,7 +303,11 @@ char* server_poll(Server server)
         response = malloc(sizeof(char) * (total_length + 1));    
         strcpy(response, poll_buffer[0]);
         for(int i = 1; i < server->queued; i++)
+        {
             strcat(response, poll_buffer[i]);
+            free(poll_buffer[i]);
+        }
+        free(poll_buffer);
     }
 
     server->alive_threads--; // Note that we are done as a thread
@@ -396,4 +406,15 @@ JobInstance server_getJob(Server server)
     pthread_mutex_unlock(&server->mtx);
 
     return job;
+}
+
+
+
+void destroy_instance(JobInstance job)
+{
+    free(job->jobID);
+    for(int i = 0; i < job->argc; i++)
+        free(job->job_argv[i]);
+    free(job->job_argv);
+    free(job);
 }

@@ -50,6 +50,7 @@ int controller(Server server, int sock)
         }
         request_argv[request_argc] = NULL;
         
+        free(command_string);
 
     }
     

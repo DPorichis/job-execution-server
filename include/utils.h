@@ -65,7 +65,7 @@ typedef struct server* Server;
 
 Server server_create(int bufsize, int concurrency, int worker_num, pthread_t main);
 
-char* server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket);
+int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket);
 
 char* server_setConcurrency(Server server, int new_conc);
 
@@ -78,3 +78,6 @@ char* server_exit(Server server);
 void server_destroy(Server server);
 
 JobInstance server_getJob(Server server);
+
+
+void destroy_instance(JobInstance job);
