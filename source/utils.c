@@ -195,7 +195,7 @@ char* server_stop(Server server, char* id)
         if (server->job_queue[pos] != NULL)
         {
             // To find the requested jobID
-            if (strcmp(server->job_queue[i]->jobID, id) == 0)
+            if (strcmp(server->job_queue[pos]->jobID, id) == 0)
             {
                 // Destroy it
                 server->job_queue[pos] = NULL;
@@ -204,6 +204,8 @@ char* server_stop(Server server, char* id)
                 {
                     pos = (server->front + j) % server->size;
                     int mov_pos = (server->front + j + 1) % server->size;
+                    printf("moving %d <- %d", pos, mov_pos);
+                    fflush(stdout);
                     server->job_queue[pos] = server->job_queue[mov_pos];
                     server->job_queue[mov_pos] = NULL;
                 }
