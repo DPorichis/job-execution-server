@@ -206,7 +206,7 @@ char* server_stop(Server server, char* id)
                 server->job_queue[pos] = NULL;
 
                 // Reorder the positioning so it is continius again
-                for(int j = i; j < server->queued; j++)
+                for(int j = i; j < server->queued - 1; j++)
                 {
                     pos = (server->front + j) % server->size;
                     int mov_pos = (server->front + j + 1) % server->size;
@@ -234,7 +234,7 @@ char* server_stop(Server server, char* id)
     }
 
     // If the buffer was full before this deletion, alert a waiting controller to place a job
-    if(server->size - 1 != server->queued)
+    if(server->size - 1 == server->queued)
         pthread_cond_signal(&server->alert_controller);
 
     server->alive_threads--; // Note that we are done as a thread
@@ -302,14 +302,15 @@ char* server_poll(Server server)
         // If jobs where found create a response containing all the job tupples
         response = malloc(sizeof(char) * (total_length + 1));    
         strcpy(response, poll_buffer[0]);
+        free(poll_buffer[0]);
         for(int i = 1; i < server->queued; i++)
         {
             strcat(response, poll_buffer[i]);
             free(poll_buffer[i]);
         }
-        free(poll_buffer);
     }
-
+    free(poll_buffer);
+    
     server->alive_threads--; // Note that we are done as a thread
 
     // If the server is on an exiting status and we where the last thread standing,

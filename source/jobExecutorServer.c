@@ -187,8 +187,10 @@ void handle_exiting(int sig)
                 exit(EXIT_FAILURE);
             }
         
-            //! Destroy the job
-            
+            // Destroy the job
+            destroy_instance(server->job_queue[i]);
+
+
             server->job_queue[i] = NULL;
         }
     }
@@ -211,11 +213,11 @@ void handle_exiting(int sig)
     close(server->sock);
     pthread_mutex_unlock(&server->mtx);
 
-    printf("main thread exiting\n");
-    fflush(stdout);
+    // printf("main thread exiting\n");
+    // fflush(stdout);
 
     server_destroy(server);
     server = NULL;
-    exit(0);
+    pthread_exit(0);
 
 }

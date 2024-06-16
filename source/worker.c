@@ -28,7 +28,7 @@ int worker(Server server)
         {
             // Exit as a thread
             pthread_cond_broadcast(&server->alert_controller);
-            pthread_exit(0);
+            return 0;
         }
 
         // Execute the job that was assigned
@@ -130,7 +130,10 @@ int worker(Server server)
         // Close everything and move to the next job
         close(to_execute->socket);
         close(output_file);
-        unlink(name);    
+        unlink(name);
+
+        // Don't forget to free up the space of the job instance  
+        destroy_instance(to_execute);
     }
 }
 
@@ -141,4 +144,7 @@ int worker(Server server)
 void * wrapper_worker(void* args)
 {
     worker((Server)args);
+    // printf("Worker exits\n");
+    // fflush(stdout);
+    pthread_exit(0);
 }

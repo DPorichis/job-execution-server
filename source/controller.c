@@ -106,6 +106,13 @@ int controller(Server server, int sock)
             free(response_message);
         }
         close(sock);
+        
+        if(request_argv != NULL)
+        {
+            for(int i = 0; i < request_argc; i++)
+                free(request_argv[i]);
+            free(request_argv);
+        }
     }
 
 }
@@ -117,4 +124,5 @@ void* wrapper_controller(void * arg)
     ControllerArgs cntrl = arg;
     controller(cntrl->server, cntrl->sock);
     free(arg);
+    pthread_exit(0);
 }
