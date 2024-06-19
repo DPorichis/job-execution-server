@@ -1,10 +1,7 @@
 #include "utils.h"
 
-
+// The routine of a controller thread
 int worker(Server server);
 
-
-// Function for creating a worker thread, 
-// the void * will be casted as a jobInstance pointer
-// and worker function will be called
+// Wrapper function for dereferencing the argument
 void * wrapper_worker(void* args);
