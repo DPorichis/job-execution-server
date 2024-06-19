@@ -66,6 +66,10 @@ int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socke
         // Exiting Occured, stopping
         response_message = malloc(sizeof(char) * strlen("SERVER TERMINATED BEFORE EXECUTION\n") + 1);
         strcpy(response_message, "SERVER TERMINATED BEFORE EXECUTION\n");
+        // Free up the space of job as it wont be used
+        for(int i = 0; i < job_argc; i++)
+            free(job_argv[i]);
+        free(job_argv);
     }
     else
     {    
@@ -181,6 +185,7 @@ char* server_setConcurrency(Server server, int new_conc)
     char* conc_string = my_itoa(new_conc);
     char* response_message  = malloc(strlen("CONCURRENCY SET AT ") + strlen(conc_string) + 1);
     sprintf(response_message, "CONCURRENCY SET AT %s\n", conc_string);
+    free(conc_string); 
 
     return response_message;
 }
