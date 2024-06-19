@@ -3,17 +3,17 @@ Name: Dimitrios - Stefanos Porichis
 AM: 1115202100159
 
 Compilation: To compile this project use `make all` in the main folder, then you can execute right from there with `./bin/jobCommander ...`
-    -make also compiles progDelay as ./bin/progDelay
+	-make also compiles progDelay as ./bin/progDelay
 
 ==========Running notes=========== 
-    - Issuing a job containing a program in the local directory requires ./ in front of it 
+	- Issuing a job containing a program in the local directory requires ./ in front of it 
     - To run commands you need to specify the bin directory: 
     ./bin/jobCommander …, ./bin/jobExecutorServer …, ./bin/progDelay … 
     - Everything else is according to the assignment's standards.
 
 =======Code structure notes=======
   The source code of this project is spit to 3 directories:
-    -source: Contains all source code
+	-source: Contains all source code
     -headers: Contains all the header files of utils
     -bin: Contains all the executables
     -build: Contains all the object files
@@ -23,7 +23,8 @@ Compilation: To compile this project use `make all` in the main folder, then you
     - jobExecutorServer.c: Contains the implementation of the server's main thread.
     - controller.c: Contains the implementation of a controller thread.
     - worker.c: Contains the implementation of a worker thread.
-    - utils.c: Contains all implementations of functions regarding the use of shared variables. The majority of the locking and synchronization logic is in this file.
+    - utils.c: Contains all implementations of functions regarding the use of shared variables. 
+      The majority of the locking and synchronization logic is in this file.
   JobCommander's:
     - jobCommander.c: Contains the implementation of the jobCommander.
   Other:
@@ -31,22 +32,22 @@ Compilation: To compile this project use `make all` in the main folder, then you
     - helpfunc.c: Contains the implementation of helper functions, that are not that useful.
 
 =======Implementation notes=======
-  Structures of the implementation:
+Structures of the implementation:
     - JobInstance: Contains all information needed for a job
-    - Server: Represents the central structure of the server. It contains all information for the state of the program as well as the buffer and synchronization structure.
-    Note: The functions for controlling these structures won't be analyzed here, refer to the header files for more details
-
+    - Server: Represents the central structure of the server. It contains all information for the state of the program as well as the buffer and synchronization
+	structure.  
+  Note: The functions for controlling these structures won't be analyzed here, refer to the header files for more details
 
 Main thread's behavior:
-	    By calling ./jobExecutorServer with the according arguments, the server will initialize its server structures, create its worker threads, and wait for connections in the port specified. Every new connection will be assigned to its controller thread as described by the assignment.
-        The main thread will accept connections in a loop until it receives a termination signal (SIGUSR1). At that point, the termination signal handler will be activated and proceed to close the listening socket and exit the main thread. 
+	By calling ./jobExecutorServer with the according arguments, the server will initialize its server structures, create its worker threads, and wait for connections in the port specified. Every new connection will be assigned to its controller thread as described by the assignment.
+    The main thread will accept connections in a loop until it receives a termination signal (SIGUSR1). At that point, the termination signal handler will be activated and proceed to close the listening socket and exit the main thread. 
     Note: the exit of the main thread won't terminate the server process, as other threads will be active.
 
 Controller thread’s behavior:
     Whenever a new connection is established, the main thread locks the main structure and creates a new controller thread, updating the number of threads now alive. Controller threads take the socket and the server structure as arguments, and perform the communication protocol listed below:
 
 [Communication protocol]
-	The client (JobCommander) will send a request tuple, consisting of 3 int values:
+    The client (JobCommander) will send a request tuple, consisting of 3 int values:
         - Number of arguments of command
         - Total character length of the command's arguments
         - Command identification (ENUM value)
@@ -59,8 +60,6 @@ Controller thread’s behavior:
 
     Transmission of output is sent in packets of 256 bytes, as it is read from a file and its length could be too large to be sent as one. Before each packet is sent an integer containing its length is transmitted. The end of the communication is signaled when this length integer is set to zero.
 
-[]
-
 [Actions on Shared Variables]
 Buffer Actions and synchronization
 	This implementation achieves a safe usage of the shared buffer using:
@@ -70,6 +69,9 @@ Buffer Actions and synchronization
             + alertWorkers: To signal waiting workers that there is a job available for execution, and concurrency allows the execution
             + alertExiting: To signal the controller thread responsible for exiting that ALL threads are done using the shared variables.
         - Multiple counters and variables for storing metadata.
+
 Here is a short sum-up of how each action on the buffer is performed:
     - IssueJob: The function locks the mutex and checks for storage available, waiting under the alertControllers condition variable if no space is available. Afterward, it creates a job instance for the described job and stores it in the circular buffer, updating the according counters. Before leaving, it checks if a worker thread could execute the job issued, signaling one if so. After that, the mutex is unlocked, and the submission message is sent to the client
-
+	- SetConcurrency: The functions locks the mutex changes the concurrency to the desired value and signals workers to execute a job, if possible with the new concurrency level. After that the mutex is unlocked and the response message is constructed
+	- Poll: The function locks the mutex to ensure the state of the buffer stays the same, and goes over all queued jobs, constructing a representation string for each. It then unlocks the mutex and constructs a continious string containing all the representations stored earlier and returns it.
+	- Stop: The function locks the mutex, and goes over all queued jobs checking if the ID matches. If the job is found it destroys it and shifts the remaining jobs left to fill the gap.
