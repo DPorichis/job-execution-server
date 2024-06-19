@@ -36,6 +36,7 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
 
     serv->exiting = 0; // We are not exiting
     serv->alive_threads = worker_num; // Number of active threads in the process
+    serv->accepting_connections = 1; // The listening socket is on
 
     // Initializing condition variables and the mutex
     pthread_cond_init(&serv->alert_worker, NULL);
@@ -330,14 +331,85 @@ char* server_exit(Server server)
     // Accessing shared data, lock the mutex
     pthread_mutex_lock(&server->mtx);
 
-    pthread_kill(server->main_thread, SIGUSR1); // Signal the mainthread to start the exiting process
+    if(server->exiting == 1) // If the exiting process has already started by someone else, dont do anything
+    {
+        char* response = malloc(sizeof(char) * (strlen("SERVER ALREADY TERMINATING\n") + 1));
+        sprintf(response, "SERVER ALREADY TERMINATING\n");
+        server->alive_threads--;
+        pthread_mutex_unlock(&server->mtx);
+        return response;
+    }
+
+
+    pthread_kill(server->main_thread, SIGUSR1); // Signal the mainthread to close the socket
     
     server->exiting = 1; // Indicate Exiting status
 
     server->alive_threads--;
     
-    // End of accessing shared data
+    // Stop all queued jobs
+    for(int i = 0; i < server->size; i++)
+    {
+        // The message that will be sent to the waiting clients
+        char* response_message = "SERVER TERMINATED BEFORE EXECUTION\n";
+        int number_of_char_response = strlen(response_message) + 1;
+
+        // For every actual job
+        if(server->job_queue[i] != NULL)
+        {
+            // Send message length to client
+            int sock = server->job_queue[i]->socket;
+            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+
+            // And the termination message
+            if(number_of_char_response !=0)
+            {
+                // Send them using our private communication
+                if(write(sock, response_message, number_of_char_response*sizeof(char)) < 0)
+                {
+                    perror("write");
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            // Indicate end of communication
+            number_of_char_response = 0;
+            if(write(sock, &number_of_char_response, sizeof(int)) < 0)
+            {
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+        
+            // Destroy the job
+            destroy_instance(server->job_queue[i]);
+
+
+            server->job_queue[i] = NULL;
+        }
+    }
+    server->front = 0;
+    server->queued = 0;
+    
+    // Wake-up everyone to let them know we are exiting
+    pthread_cond_broadcast(&server->alert_controller);
+    pthread_cond_broadcast(&server->alert_worker);
+
+    // Waiting for all threads to stop
+    while(server->alive_threads != 0 || server->accepting_connections == 1)
+    {
+        printf("%d threads still alive\n", server->alive_threads);
+        fflush(stdout);
+        pthread_cond_wait(&server->alert_exiting, &server->mtx);
+    }
+    
     pthread_mutex_unlock(&server->mtx);
+
+    server_destroy(server);
+    server = NULL;
 
     // Create the response string and return it
     char* response = malloc(sizeof(char) * (strlen("SERVER TERMINATED\n") + 1));

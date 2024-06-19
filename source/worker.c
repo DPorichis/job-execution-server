@@ -126,6 +126,11 @@ int worker(Server server)
             perror("write");
             exit(EXIT_FAILURE);
         }
+
+        if (shutdown(to_execute->socket, SHUT_WR) < 0) {
+            perror("shutdown failed");
+            exit(EXIT_FAILURE);
+        }
         
         // Close everything and move to the next job
         close(to_execute->socket);
@@ -144,7 +149,7 @@ int worker(Server server)
 void * wrapper_worker(void* args)
 {
     worker((Server)args);
-    // printf("Worker exits\n");
-    // fflush(stdout);
+    printf("Worker exits\n");
+    fflush(stdout);
     pthread_exit(0);
 }

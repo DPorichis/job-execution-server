@@ -45,7 +45,7 @@ struct server
     int total_jobs;
     int exiting;
     int alive_threads;
-
+    int accepting_connections;
 
     // Sync Control
     pthread_mutex_t mtx;

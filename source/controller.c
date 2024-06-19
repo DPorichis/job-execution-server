@@ -53,7 +53,8 @@ int controller(Server server, int sock)
         free(command_string);
 
     }
-    
+
+
     // Depending on the type of the request, call the relevant server_*function*
     // Note: These functions contain locking logic, the caller may be suspended
     // for arbitrary time due to these locks.
@@ -105,6 +106,12 @@ int controller(Server server, int sock)
             }
             free(response_message);
         }
+
+        if (shutdown(sock, SHUT_WR) < 0) {
+            perror("shutdown failed");
+            exit(EXIT_FAILURE);
+        }
+
         close(sock);
         
         if(request_argv != NULL)
@@ -124,5 +131,7 @@ void* wrapper_controller(void * arg)
     ControllerArgs cntrl = arg;
     controller(cntrl->server, cntrl->sock);
     free(arg);
+    printf("Controller Exits\n");
+    fflush(stdout);
     pthread_exit(0);
 }

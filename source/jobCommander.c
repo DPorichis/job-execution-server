@@ -170,6 +170,11 @@ int main(int argc, char* argv[])
         free(transmit);
     }
 
+    if (shutdown(sock, SHUT_WR) < 0) {
+        perror("shutdown failed");
+        exit(EXIT_FAILURE);
+    }
+
     // Now we wait for server's response
 
     // Optain the length of the response
