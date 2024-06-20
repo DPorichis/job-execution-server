@@ -1,3 +1,5 @@
+all: jobExecutorServer jobCommander progDelay
+
 # paths
 SOURCE = ./source
 HEAD = ./include
@@ -23,5 +25,3 @@ jobCommander: $(COMOBJ)
 
 progDelay: $(TESOBJ)
 	gcc $(TESOBJ) -o $(BIN)/progDelay
-
-all: jobExecutorServer jobCommander progDelay
