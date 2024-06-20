@@ -70,7 +70,7 @@ int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socke
 // NOTE: This function includes locking logic
 char* server_setConcurrency(Server server, int new_conc);
 
-// Searches the job buffer for a job with a matching ID, destroying it if found. 
+// Searches the job buffer for a job with matching ID, destroying it if found. 
 // It returns a response message for client (needs deallocation after transmition)
 // NOTE: This function includes locking logic
 char* server_stop(Server server, char* id);
@@ -87,15 +87,15 @@ char* server_poll(Server server);
 // NOTE: This function includes locking logic
 char* server_exit(Server server);
 
-// Destroys the server struct, freeing up all the space
-// NOTE: Make SURE that the mutex is UNLOCKED and NO THREAD will try to access the server
-// BEFORE calling this command
-void server_destroy(Server server);
-
 // Tries to optain a job from the buffer, and returns it.
 // If exiting occurs the function will return NULL
 // NOTE: This function includes locking and waiting logic
 JobInstance server_getJob(Server server);
+
+// Destroys the server struct, freeing up all the space
+// NOTE: Make SURE that the mutex is UNLOCKED and NO THREAD will try to access the server
+// BEFORE calling this command
+void server_destroy(Server server);
 
 // Frees up all space occupied by job
 void destroy_instance(JobInstance job);

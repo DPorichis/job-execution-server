@@ -92,7 +92,7 @@ int worker(Server server)
         // Writting the end tag at the end of the file
         lseek(output_file, 0, SEEK_END);
         char buffer[256];
-        int used = sprintf(buffer, "-----%s output end-----\n", to_execute->jobID);
+        int used = sprintf(buffer, "\n-----%s output end-----\n", to_execute->jobID);
         if (write(output_file, buffer, used) < 0)
         {
             perror("output manipulation error");
@@ -105,7 +105,7 @@ int worker(Server server)
         // Read a max of 256 charachters at a time
         while((transmit_size = read(output_file, buffer, 256)) > 0)
         {
-            printf("Transmiting %d characters\n", transmit_size);
+            //printf("Transmiting %d characters\n", transmit_size);
             // Transmit the length of the message
             if(write(to_execute->socket, &transmit_size, sizeof(int)) < 0)
             {
@@ -149,7 +149,7 @@ int worker(Server server)
 void * wrapper_worker(void* args)
 {
     worker((Server)args);
-    printf("Worker exits\n");
-    fflush(stdout);
+    // printf("Worker exits\n");
+    // fflush(stdout);
     pthread_exit(0);
 }

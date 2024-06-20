@@ -47,6 +47,7 @@ int main(int argc, char* argv[])
 
     // Creating the listening socket
     // -- From Lecture code --
+    // (sockets and pointers saved in server structure from an older implementation)
     struct sockaddr *serverptr = (struct sockaddr *)&server->serv;
     struct sockaddr *clientptr = (struct sockaddr *)&server->client;
     struct hostent *rem;
@@ -94,7 +95,7 @@ int main(int argc, char* argv[])
     int newsock;
 
     // Creating a signal set that includes only SIGUSR1
-    // to activate while we are in critical parts
+    // to block while we are in critical parts
     sigset_t ignore_child;
     sigemptyset(&ignore_child);
     sigaddset(&ignore_child, SIGUSR1);
@@ -147,12 +148,13 @@ int main(int argc, char* argv[])
 
 void handle_exiting(int sig)
 {
-    // Everyone left, lets destroy that thing
+    // Stop recieving new connections
     close(server->sock);
 
     printf("main thread exiting\n");
     fflush(stdout);
 
+    // Let exiting thread know we are done
     pthread_mutex_lock(&server->mtx);
     
     server->accepting_connections = 0;

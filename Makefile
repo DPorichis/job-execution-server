@@ -7,7 +7,6 @@ BIN = ./bin
 
 CFLAGS = -g -I$(HEAD)
 
-# Αρχεία .o
 COMOBJ = $(BUILD)/jobCommander.o $(BUILD)/helpfunc.o $(BUILD)/utils.o
 SEROBJ = $(BUILD)/jobExecutorServer.o $(BUILD)/helpfunc.o $(BUILD)/worker.o $(BUILD)/controller.o $(BUILD)/utils.o
 TESOBJ = $(BUILD)/progDelay.o

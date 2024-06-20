@@ -35,7 +35,7 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
     serv->concurrency = concurrency;
 
     serv->exiting = 0; // We are not exiting
-    serv->alive_threads = worker_num; // Number of active threads in the process
+    serv->alive_threads = worker_num; // Number of alive threads in the process
     serv->accepting_connections = 1; // The listening socket is on
 
     // Initializing condition variables and the mutex
@@ -49,6 +49,9 @@ Server server_create(int bufsize, int concurrency, int worker_num, pthread_t mai
     return serv;
 }
 
+// Tries to insert the job described by the arguments to the buffer
+// The function will communicate the outcome of the insertion to the client
+// NOTE: This function includes locking and waiting logic
 int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socket)
 {
     // Accessing shared data, lock the mutex
@@ -159,6 +162,9 @@ int server_issueJob(Server server, char* job_argv[], int job_argc, int job_socke
 
 }
 
+// Sets the server's concurrency to new_conc, alerting workers to optain a job if "legal"
+// It returns a response message for client (needs deallocation after transmition)
+// NOTE: This function includes locking logic
 char* server_setConcurrency(Server server, int new_conc)
 {
     // Accessing shared data, lock the mutex
@@ -190,7 +196,9 @@ char* server_setConcurrency(Server server, int new_conc)
     return response_message;
 }
 
-
+// Searches the job buffer for a job with matching ID, destroying it if found. 
+// It returns a response message for client (needs deallocation after transmition)
+// NOTE: This function includes locking logic
 char* server_stop(Server server, char* id)
 {
     // Accessing shared data, lock the mutex
@@ -211,7 +219,7 @@ char* server_stop(Server server, char* id)
                 destroy_instance(server->job_queue[pos]);
                 server->job_queue[pos] = NULL;
 
-                // Reorder the positioning so it is continius again
+                // Reorder the positioning to keep the circular buffer working
                 for(int j = i; j < server->queued - 1; j++)
                 {
                     pos = (server->front + j) % server->size;
@@ -257,6 +265,9 @@ char* server_stop(Server server, char* id)
 
 }
 
+// Constructs a response message for client, listing all the jobs queued in the buffer
+// (needs deallocation after transmition)
+// NOTE: This function includes locking logic
 char* server_poll(Server server)
 {
     // Accessing shared data, lock the mutex
@@ -331,6 +342,11 @@ char* server_poll(Server server)
 
 }
 
+// Initializes the exiting routine. 
+// It signals the server to stop accepting connections, clears the buffer and waits
+// for ALL threads to finish their exiting routine.
+// It returns a response message for client (needs deallocation after transmition)
+// NOTE: This function includes locking logic
 char* server_exit(Server server)
 {
     // Accessing shared data, lock the mutex
@@ -391,8 +407,6 @@ char* server_exit(Server server)
         
             // Destroy the job
             destroy_instance(server->job_queue[i]);
-
-
             server->job_queue[i] = NULL;
         }
     }
@@ -413,6 +427,7 @@ char* server_exit(Server server)
     
     pthread_mutex_unlock(&server->mtx);
 
+    // Everyone left destroy that thing
     server_destroy(server);
     server = NULL;
 
@@ -422,23 +437,9 @@ char* server_exit(Server server)
     return response;
 }
 
-
-void server_destroy(Server server)
-{
-    // Free up the job_queue
-    free(server->job_queue);
-
-    // Destroy the conditions and mutex
-    pthread_cond_destroy(&server->alert_worker);
-    pthread_cond_destroy(&server->alert_controller);
-    pthread_cond_destroy(&server->alert_exiting);
-    pthread_mutex_destroy(&server->mtx);
-
-    // Free the struct itself
-    free(server);
-
-}
-
+// Tries to optain a job from the buffer, and returns it.
+// If exiting occurs the function will return NULL
+// NOTE: This function includes locking and waiting logic
 JobInstance server_getJob(Server server)
 {
     // Accessing shared data, lock the mutex
@@ -458,7 +459,6 @@ JobInstance server_getJob(Server server)
 
         // If the server is on an exiting status and we where the last thread standing,
         // alert the exiting function that we are done
-
         if(server->alive_threads == 0)
             pthread_cond_signal(&server->alert_exiting);
         
@@ -486,8 +486,26 @@ JobInstance server_getJob(Server server)
     return job;
 }
 
+// Destroys the server struct, freeing up all the space
+// NOTE: Make SURE that the mutex is UNLOCKED and NO THREAD will try to access the server
+// BEFORE calling this command
+void server_destroy(Server server)
+{
+    // Free up the job_queue
+    free(server->job_queue);
 
+    // Destroy the conditions and mutex
+    pthread_cond_destroy(&server->alert_worker);
+    pthread_cond_destroy(&server->alert_controller);
+    pthread_cond_destroy(&server->alert_exiting);
+    pthread_mutex_destroy(&server->mtx);
 
+    // Free the struct itself
+    free(server);
+
+}
+
+// Frees up all space occupied by job
 void destroy_instance(JobInstance job)
 {
     free(job->jobID);

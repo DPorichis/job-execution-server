@@ -64,7 +64,7 @@ int controller(Server server, int sock)
     switch (cmd) 
     {
         case ISSUE_JOB: ;
-            response_message = server_issueJob(server, request_argv ,request_argc, sock);
+            server_issueJob(server, request_argv ,request_argc, sock);
             break;
         case SET_CONCURRENCY:
             response_message = server_setConcurrency(server, my_atoi(request_argv[0]));
@@ -131,7 +131,7 @@ void* wrapper_controller(void * arg)
     ControllerArgs cntrl = arg;
     controller(cntrl->server, cntrl->sock);
     free(arg);
-    printf("Controller Exits\n");
-    fflush(stdout);
+    // printf("Controller Exits\n");
+    // fflush(stdout);
     pthread_exit(0);
 }

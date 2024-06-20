@@ -1,8 +1,8 @@
+// helpfunc.c: Contains itoa and atoi implementations, because I wasn't sure if
+// the standard implementations are available in linux lab.
+
 #include "helpfunc.h"
 #include <stdlib.h>
-
-// This file contains itoa and atoi implementations, because I wasn't sure if
-// the standard implementations are available in linux lab.
 
 char* my_itoa (int value)
 {

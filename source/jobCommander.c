@@ -1,5 +1,4 @@
 // jobCommander.c : Contains the implementation of the client
-
 // NOTE: The majority of code is reused from project 1
 
 #include <stdio.h>
