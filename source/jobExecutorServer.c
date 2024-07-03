@@ -84,14 +84,14 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    if(listen(server->sock, 10) < 0)
+    if(listen(server->sock, 20) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
 
 
-    printf("Now listening for connections to port %d\n", server->port);
+    printf("Now listening for connections\n");
     int newsock;
 
     // Creating a signal set that includes only SIGUSR1
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
             perror("accept");
             exit(EXIT_FAILURE);
         }
-        printf("Connection Accepted\n");
+        // printf("Connection Accepted\n");
 
         pthread_t thr;
         int err, status;
@@ -151,8 +151,8 @@ void handle_exiting(int sig)
     // Stop recieving new connections
     close(server->sock);
 
-    printf("main thread exiting\n");
-    fflush(stdout);
+    // printf("main thread exiting\n");
+    // fflush(stdout);
 
     // Let exiting thread know we are done
     pthread_mutex_lock(&server->mtx);

@@ -44,7 +44,7 @@ Main thread's behavior:
     handler will be activated and will proceed to close the listening socket and exit the main thread. 
     
     Note: The exit of the main thread won't terminate the server process, as other threads will be active. 
-    Also, note that all created threads are detached so doesn't need to wait for them.
+    Also, note that all created threads are detached so main doesn't need to wait for them.
 
 Controller thread’s behavior:
     Whenever a new connection is established, the main thread locks the main structure and creates a new controller thread, 
@@ -84,7 +84,7 @@ Worker thread's behavior:
         - 3 condition variables:
             + alertControllers: To signal waiting controllers that space is available if they are waiting to store a job
             + alertWorkers: To signal waiting workers that there is a job available for execution, and concurrency allows the execution
-            + alertExiting: To signal the controller thread responsible for exiting that ALL threads are done using the shared variables.
+            + alertExiting: To signal the controller thread responsible for exiting that threads are done using the shared variables.
         - Multiple counters and variables for storing metadata.
 
     Here is a short sum-up of how each action on the buffer is performed:
