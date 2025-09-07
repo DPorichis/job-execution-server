@@ -6,8 +6,6 @@ Through the design, the code demonstrates thread-based concurrency, safe shared 
 
 *This project was developed as part of the [**K24 System Programming Course**](https://cgi.di.uoa.gr/~mema/courses/k24/k24.html) at the National and Kapodistrian University of Athens.*  
 
-
-
 ## Quick Start Guide  
 
 This project consists of three main executables:  
@@ -26,7 +24,7 @@ make all
 
 ### Execution
 
-You can run the executables from the `bin` folder with their coresponding arguments:
+You can run the executables from the `bin` folder with their corresponding arguments:
 
 ```
 ./bin/jobExecutorServer <port> <buffersize> <threadpoolsize>
@@ -36,7 +34,7 @@ You can run the executables from the `bin` folder with their coresponding argume
 
 #### JobCommander's Possible Actions
 
-- `issueJob [job arguments]`: Issues a job to be executed by the jobExecutorServer, described in the job arguments (unix commands).
+- `issueJob [job arguments]`: Issues a job to be executed by the jobExecutorServer, described in the job arguments.
 - `setConcurrency <number>`: Requests the change of the number of worker threads used by the JobExecutorServer.
 - `stop <job_id>`: Requests the termination of job `job_id`.
 - `poll`: Requests a list of all pending jobs of the jobExecutorServer.
@@ -66,9 +64,9 @@ The source code is organized into the following directories:
 - `progDelay.c`: Simple delay-based test program.
 - `helpfunc.c`: Miscellaneous helper functions.
 
-## Implementation Notes - Thread Behaivor
+## Thread Behavior
 
-Bellow we descibe the behavior of the different types of threads used by the JobExecutorServer
+Below, we describe the behavior of the different types of threads used by the JobExecutorServer.
 
 ### Main Thread 
 
@@ -134,4 +132,4 @@ The shared buffer is protected by:
     - `alertWorkers`: Notify workers when jobs are available and concurrency allows execution.
     - `alertExiting`: Notify the exiting controller when all threads are done with shared variables.
 
-Throught this mechanisms **job execution and client communication** run in **parallel** while access to the *shared buffer* operations are *serialized* to ensure thread safety.
+Through these mechanisms, **job execution and client communication** run in **parallel** while access to the *shared buffer* operations are *serialized* to ensure thread safety.
