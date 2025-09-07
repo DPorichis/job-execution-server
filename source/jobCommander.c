@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
 
     if(argc < 4)
     {
-        printf("Wrong use, try again\n");
+        printf("Wrong arguments, use: ./jobCommander <server_address> <port> <action>\n");
         return -2;
     }
 
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
     {
         if(argc == 4)
         {
-            printf("Missing command after issueJob\n");
+            printf("Missing command after issueJob actions.\n Use: ./jobCommander <server_address> <port> issueJob <command> [args...]\n");
             return -2;
         }
         cmd = ISSUE_JOB;
@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
     {
         if(argc != 5)
         {
-            printf("Wrong number of arguments for setConcurrency\n");
+            printf("Wrong usage of setConcurrency. Use: ./jobCommander <server_address> <port> setConcurrency <number>\n");
             return -2;
         }
         cmd = SET_CONCURRENCY;  
@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     {
         if(argc != 5)
         {
-            printf("Wrong number of arguments for stop\n");
+            printf("Wrong usage of stop. Use: ./jobCommander <server_address> <port> stop <job_id>\n");
             return -2;
         }
         cmd = STOP;
@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
     {
         if(argc != 4)
         {
-            printf("Wrong number of arguments for poll\n");
+            printf("Wrong usage of poll. Use: ./jobCommander <server_address> <port> poll\n");
             return -2;
         }
         cmd = POLL;
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
     {
         if(argc != 4)
         {
-            printf("Wrong number of arguments for stop\n");
+            printf("Wrong usage of exit. Use: ./jobCommander <server_address> <port> exit\n");
             return -2;
         }
         cmd = EXIT;

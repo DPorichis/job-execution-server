@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 {
     if (argc != 4)
     {
-        perror("Wrong Use");
+        perror("Wrong input, use: ./jobExecutorServer <port> <buffersize> <threadpoolsize>");
         exit(EXIT_FAILURE);
     }
 
